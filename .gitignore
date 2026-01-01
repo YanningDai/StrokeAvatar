@@ -11,7 +11,7 @@
 /Assets/ML-Agents/TestScenes*
 /csharp_timers.json
 /UserSettings/
-Assets/ML-Agents/Editor/Tests*
+/Assets/ML-Agents/Editor/Tests*
 
 # Environemnt logfile
 *Project.log
@@ -34,10 +34,7 @@ Assets/ML-Agents/Editor/Tests*
 *.svd
 *.pdb
 *.DotSettings
-UnityEngine.TestRunner.dll
-app.config
-.vsconfig
-packages.config
+/UnityEngine.TestRunner.dll
 
 # Unity3D generated meta files
 *.pidb.meta
@@ -74,8 +71,8 @@ packages.config
 
 # VSCode hidden files
 *.vscode/
-.vsconfig
-app.config
-packages.config
+/.vsconfig
+/app.config
+/packages.config
 
 .DS_Store
