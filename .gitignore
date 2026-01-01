@@ -10,7 +10,7 @@
 /Assets/ML-Agents/Timers*
 /Assets/ML-Agents/TestScenes*
 /csharp_timers.json
-UserSettings/
+/UserSettings/
 Assets/ML-Agents/Editor/Tests*
 
 # Environemnt logfile
@@ -34,6 +34,10 @@ Assets/ML-Agents/Editor/Tests*
 *.svd
 *.pdb
 *.DotSettings
+UnityEngine.TestRunner.dll
+app.config
+.vsconfig
+packages.config
 
 # Unity3D generated meta files
 *.pidb.meta
