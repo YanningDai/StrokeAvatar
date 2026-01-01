@@ -93,7 +93,7 @@ public class WalkerAgent: Agent
         base.Awake();
         statsRecorder = Academy.Instance.StatsRecorder;//tensorboard输出
         //一次只录制一组动作。如果需要更多，在这个脚本里改，加一个计数
-        dirOut = "D:/UNITY/ml-agent/mlagent/Project/Assets/ObserAction/walk73.json";
+        dirOut = Path.Combine(Application.dataPath, "ObserAction/walk73.json");
         Time.fixedDeltaTime = 1.0f / framerate;//物理帧时长
         keyini = 6; keyend = 40;
 

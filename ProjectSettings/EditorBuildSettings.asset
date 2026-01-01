@@ -11,11 +11,11 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/ML-Agents/1 MotionCapture/1 Scenes/MotionCapture 1.unity
     guid: 062f7840073e93e4b8ea3d028fb360e8
-  - enabled: 0
+  - enabled: 1
     path: Assets/ML-Agents/1 MotionCapture/1 Scenes/1 Database.unity
     guid: e1755b9c062e0894fa1c98e7e8208e5e
-  - enabled: 1
-    path: Assets/ML-Agents/1 MotionCapture/1 Scenes/2 Database-5version.unity
+  - enabled: 0
+    path: Assets/ML-Agents/1 MotionCapture/1 Scenes/2 HealthyAtlas.unity
     guid: b1bb6f8a878763048b99fb3be9583def
   - enabled: 0
     path: Assets/ML-Agents/Examples/PushBlock/Scenes/PushBlock.unity

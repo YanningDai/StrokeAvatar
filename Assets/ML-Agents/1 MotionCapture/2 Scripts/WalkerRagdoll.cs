@@ -9,15 +9,13 @@ using System.Linq;
 using MathNet.Numerics.IntegralTransforms;
 using MathNet.Numerics;
 
-//2.8记录：这个是最初的加载数据、预处理的
+// Initial data loading and preprocessing (currently unused)
 
-//更新，另开一个文件夹，保存所有脚部位置和com信息，用于控制系统的学习
-//用于处理原始的数据集，把每个转化为关节角，并且消除根节点y轴导致的浮空
 public class WalkerRagdoll : MonoBehaviour
 {
 
     /// <summary>
-    /// 需要根据是否触地来改变颜色的object
+    /// Objects that change color based on ground contact
     /// </summary>
     private GameObject[] meshChangeObject;
     public Material groundedMaterial;
@@ -47,70 +45,70 @@ public class WalkerRagdoll : MonoBehaviour
     public Transform FootMeshR;
 
     /// <summary>
-    /// 全部的json文件名字符串
+    /// List of all JSON file names
     /// </summary>
     private List<string> fileList;
     /// <summary>
-    /// josn文件序号
+    /// JSON file index
     /// </summary>
     public int fileNum;
 
     /// <summary>
-    /// 记录循环结束时位置的中间变量
+    /// Temporary variable for position at the end of a loop
     /// </summary>
     public Vector3 midStartPosition;
     JointDriveController m_JdController;
     /// <summary>
-    /// 数据集中的walk数据（二维数组）,读取模式下是处理后毒，运行模式下是原始的
+    /// Walk data from the dataset (2D array); processed when reading, raw when running
     /// </summary>
     private float[,] motionCaptureData;
     /// <summary>
-    /// 原始的运动捕捉数据集列表，只包含位置、关节角，没有经过物理处理
+    /// Raw motion-capture dataset (positions and joint angles only, no physics processing)
     /// </summary>
     ImuData imuData;
     /// <summary>
-    /// 处理后的运动捕捉数据集列表，包含需要模仿的序列的全部信息（包括角速度、com位置、足部位置等）
+    /// Processed motion-capture dataset with full imitation info (angular velocity, COM, foot positions, etc.)
     /// </summary>
     ImuData2 imuData2;
     /// <summary>
-    /// 记录读到了第几个文件，初始值是0
+    /// Tracks which file has been read; starts at 0
     /// </summary>
     RbVelocity rbVelocity;//test111111111
     private int i;
     /// <summary>
-    /// 动作序列有几帧
+    /// Number of frames in the motion sequence
     /// </summary>
     private int length;
     /// <summary>
-    /// 数据集中行进方向和目标行进方向的夹角
+    /// Angle between dataset travel direction and target direction
     /// </summary>
     private float angleTowards;
     /// <summary>
-    /// json文件的地址字符串
+    /// JSON file path
     /// </summary>
     string Dir;
 
     [Header("Physics Adjustment")]
     public int framerate;
     /// <summary>
-    /// 最多使用几个物理帧优化一个动作
+    /// Maximum physics frames to refine one motion
     /// </summary>
     public int physicsLimit;
     /// <summary>
-    /// 当前属于第几个优化的物理帧
+    /// Current physics frame index for optimization
     /// </summary>
     public int adjustFrame;
     [Header("Playing Mode")]
     public bool showResult;
 
     /// <summary>
-    /// 模拟中用到的关节，本实验中不包括上肢
+    /// Joints used in the simulation; upper limbs excluded for this experiment
     /// </summary>
     List<Transform> bodylistInUse;
 
     public void Start()
     {
-        //Setup each body part，储存各种初始位置
+        // Setup each body part and cache initial poses
         m_JdController = GetComponent<JointDriveController>();
         m_JdController.SetupBodyPart(hips);
         m_JdController.SetupBodyPart(chest);
@@ -170,25 +168,25 @@ public class WalkerRagdoll : MonoBehaviour
     public class ImuData2
     {
         /// <summary>
-        /// 身体位置和姿态，只包括需要用到的几个体段
+        /// Body positions/rotations for required body segments only
         /// </summary>
         public float[,] walk;
         /// <summary>
-        /// 肢体末端位置，0-2 footL，3-5 footR，6-8 spine
+        /// End-effector positions; 0-2 footL, 3-5 footR, 6-8 spine
         /// </summary>
         public float[,] endPosition;
         /// <summary>
-        /// 足部和地面是否接触，0 footL，1 footR；接触为1，不接触为0
+        /// Foot-ground contact; 0 footL, 1 footR; 1=contact, 0=no contact
         /// </summary>
         public int[,] footContact;
         public float[,] comPosition;
         /// <summary>
-        /// 角速度，只包括需要用到的几个体段
+        /// Angular velocity for required body segments only
         /// </summary>
         public float[,] angularVelocity;
         public float[,] bodyPartVelocity;
         /// <summary>
-        /// 这段时间的步速
+        /// Average gait speed over this segment
         /// </summary>
         public float aveVelocity;
         public float stepLength;
@@ -216,34 +214,33 @@ public class WalkerRagdoll : MonoBehaviour
     void FixedUpdate()
     {
 
-        //界面参数调整，读文件
+        // UI parameter tuning and file loading
         Time.fixedDeltaTime = 1.0f / framerate;
         if (showResult == true)
         {
-            fileList = GetFiles("D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/JsonWithP/", ".json");
+            fileList = GetFiles(Path.Combine(Application.streamingAssetsPath,"JsonWithP"), ".json");
             physicsLimit = 0;
         }
         else
-            fileList = GetFiles("D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/json", ".json");
+            fileList = GetFiles(Path.Combine(Application.streamingAssetsPath,"json"), ".json");
 
-        //接触地面的变色
         GroundTouchVisualize();
 
-        //储存rb中的量 test11111
+        // Log rigidbody values (test)
         if (showResult == true && midStartPosition != Vector3.zero) RbVelocityLog();
 
-        //已处理完一个序列，重新读文件，初始化储存变量的数组
+        // After finishing a sequence, read next file and initialize buffers
         if (i == 0 && adjustFrame == 0)
         {
-            if (fileNum == fileList.Count()) { fileNum = 0; }//所有序列都处理完，就从头来
+            if (fileNum == fileList.Count()) { fileNum = 0; }// restart after finishing all sequences
             Dir = fileList[fileNum];
             foreach (var bodyPart in m_JdController.bodyPartsDict.Values)
             {
                 bodyPart.rb.velocity = Vector3.zero;
                 bodyPart.rb.angularVelocity = Vector3.zero;
             }
-            //读取数据
-            //Dir = Application.streamingAssetsPath + "/Json/walk24.json"; //调试
+            // Read data
+            //Dir = Application.streamingAssetsPath + "/Json/walk24.json"; // debug
             if (showResult == true)
             {
                 imuData2 = JsonConvert.DeserializeObject<ImuData2>(File.ReadAllText(@Dir));
@@ -256,10 +253,10 @@ public class WalkerRagdoll : MonoBehaviour
                 rbVelocity.datasetVelocity = imuData2.bodyPartVelocity;
                 rbVelocity.datasetAngleVelocity = imuData2.angularVelocity;
             }
-            else //需要物理处理
+            else // needs physics refinement
             {
-                //Dir = Application.streamingAssetsPath + "/Json/walk62.json"; //调试
-                imuData = JsonConvert.DeserializeObject<ImuData>(File.ReadAllText(@Dir));//解析自原始数据
+                //Dir = Application.streamingAssetsPath + "/Json/walk62.json"; // debug
+                imuData = JsonConvert.DeserializeObject<ImuData>(File.ReadAllText(@Dir));// parsed from raw data
                 motionCaptureData = imuData.walk;
                 length = motionCaptureData.Length / 62;
                 imuData2 = new ImuData2();
@@ -271,21 +268,21 @@ public class WalkerRagdoll : MonoBehaviour
             }
 
 
-            Debug.Log("动作序列号: " + fileNum + " 长度: " + length + " 地址" + Dir);
+            Debug.Log("Sequence index: " + fileNum + " length: " + length + " path " + Dir);
 
-            MotionDataControl(motionCaptureData);//摆出初始姿势
+            MotionDataControl(motionCaptureData);// set initial pose
             if (showResult == false)
             {
                 RecordJointPostureToController();
-                ImuData2logPosition();//记录数据;if (showResult == false)
+                ImuData2logPosition();// record data
             }
             }
         
-        if (i == length - 1 && adjustFrame == physicsLimit)//完成一个运动序列cycle，继续前进或，写文件
+        if (i == length - 1 && adjustFrame == physicsLimit)// finished one motion cycle; continue or save
         {
-            if (showResult == true)//如果为了展示，循环播放
+            if (showResult == true)// loop playback for demo
             {
-                if (Mathf.Abs(hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x) < 10)//目标是十米
+                if (Mathf.Abs(hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x) < 10)// target distance: 10m
                 {
                     midStartPosition = new Vector3(hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x, 0, 0);
                 }
@@ -293,30 +290,30 @@ public class WalkerRagdoll : MonoBehaviour
                 {
                     fileNum++;
                     midStartPosition = Vector3.zero;
-                    string Dir2 = "D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/Rigidbody/" + Dir.Remove(0, 67);
+                    string Dir2 = Path.Combine(Application.streamingAssetsPath,"Rigidbody") + Dir.Remove(0, 67);
                     File.WriteAllText(Dir2, JsonConvert.SerializeObject(rbVelocity), new System.Text.UTF8Encoding(false));
                 }
             }
-            if (showResult == false)//如果是为了物理调整，保存到原文件中
+            if (showResult == false)// when refining physics, save back to source
             {
                 fileNum++;
                 midStartPosition = Vector3.zero;
 
-                UpdateIniVelocity();//把第二帧速度填入第一帧，把新的hip高度填进去
-                UpdateStepInformation();//改成直接把原始的填入
+                UpdateIniVelocity();// fill first-frame velocity, update new hip height
+                UpdateStepInformation();// use original step info directly
                 FinalProcessing();
-                Debug.Log("行走平均速度：" + imuData2.aveVelocity);
+                Debug.Log("Average walking speed: " + imuData2.aveVelocity);
 
-                //储存
-                string Dir2 = "D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/JsonWithP/" + Dir.Remove(0, 62);
+                // Save
+                string Dir2 = Path.Combine(Application.streamingAssetsPath,"JsonWithP") + Dir.Remove(0, 62);
                 File.WriteAllText(Dir2, JsonConvert.SerializeObject(imuData2), new System.Text.UTF8Encoding(false));
             }
             i = 0; adjustFrame = -1;
 
         }
-        else if (adjustFrame == physicsLimit)//每帧完成物理调整后，记录hip高度信息，摆新动作
+        else if (adjustFrame == physicsLimit)// after each physics step, record hip height and move to next frame
         {
-            if (i > 0 && i < length)//画辅助线
+            if (i > 0 && i < length)// draw helper lines
             {
                 Transform lineBody = footL;
                 Debug.DrawLine(m_JdController.bodyPartsDict[lineBody].PrePosition, lineBody.position, Color.grey, 2);
@@ -329,15 +326,15 @@ public class WalkerRagdoll : MonoBehaviour
 
             i++;
 
-            MotionDataControl(motionCaptureData); //摆动作
+            MotionDataControl(motionCaptureData); // pose actor
 
-            //这里需要加一个检测到地面距离的
+            // Add distance-to-ground detection here
             if (showResult == false)
             {
-                RecordJointVelocityToController();//记录相对上一帧的线速度和角速度 ,通用
-                ImuData2logVolocity();//储存新数据集中速度信息。包括angularVelocity和bodyPartVelocity;if (showResult == false) 
-                RecordJointPostureToController();//更新所有jointcontroller中的pre数据，记录当前rotation和postion（世界坐标系）,通用
-                ImuData2logPosition();//记录数据,在这里加入了hip下降和足部触地;if (showResult == false) 
+                RecordJointVelocityToController();// log linear/angular velocity vs previous frame
+                ImuData2logVolocity();// store angularVelocity/bodyPartVelocity in new dataset
+                RecordJointPostureToController();// update controller pre-rotation/position (world space)
+                ImuData2logPosition();// store data including hip drop and foot contact
             }
 
             adjustFrame = -1;
@@ -360,16 +357,16 @@ public class WalkerRagdoll : MonoBehaviour
         Vector3 radStart = new Vector3(footL.position.x, minheight - r, footL.position.z);
         Vector3 radStart2 = new Vector3(footR.position.x, minheight - r, footR.position.z);
 
-        RaycastHit[] hit;//检测射线碰撞
+        RaycastHit[] hit;// raycast hits
 
         List<float> rayDistancelist = new List<float>(); ;
 
-        hit = Physics.RaycastAll(radStart, Vector3.down, 500f, ~(1 << 0));//有碰撞物体
+        hit = Physics.RaycastAll(radStart, Vector3.down, 500f, ~(1 << 0));// with collisions
 
 
         for (int c = 0; c < hit.Length; c++)
         {
-            if (hit[c].collider.gameObject.CompareTag("ground"))//碰撞物体为地面
+            if (hit[c].collider.gameObject.CompareTag("ground"))// collider is ground
             { rayDistancelist.Add(hit[c].distance); }
         }
 
@@ -381,7 +378,7 @@ public class WalkerRagdoll : MonoBehaviour
 
         imuData2.footContact[i, 0] = Mathf.Abs(footLv1.y - minheight) < 0.02f || Mathf.Abs(footLv2.y - minheight) < 0.02f ? 1 : 0;
         imuData2.footContact[i, 1] = Mathf.Abs(footRv1.y - minheight) < 0.02f || Mathf.Abs(footRv2.y - minheight) < 0.02f ? 1 : 0;
-        return rayDistancelist.Min();//返回最近的地面
+        return rayDistancelist.Min();// nearest ground distance
     }
 
 
@@ -439,9 +436,9 @@ public class WalkerRagdoll : MonoBehaviour
     }
 
     /// <summary>
-    /// 求重心位置com
+    /// Compute center of mass
     /// </summary>
-    /// <returns>全局坐标系下重心位置</returns>
+    /// <returns>COM in world space</returns>
     private Vector3 ComCalculate()
     {
         Vector3 com = Vector3.zero; float mass = 0;
@@ -451,21 +448,21 @@ public class WalkerRagdoll : MonoBehaviour
              mass += m_JdController.bodyPartsDict[trans].rb.mass;
 
         }
-        com /= mass;//重心位置
+        com /= mass;// COM position
         return com;
     }
 
     /// <summary>
-    /// 对所有tag是mesh的物体，进行触地检测，触地时变色
+    /// For all objects tagged "mesh", check ground contact and swap material on contact
     /// </summary>
     public void GroundTouchVisualize()
     {
 
         foreach (var meshObject in meshChangeObject)
         {
-            //查找父级物体
+            // find parent transform
             Transform parentTransform = meshObject.transform.parent;
-            //如果父级物体有关节属性
+            // if parent transform has a joint controller entry
             if (m_JdController.bodyPartsDict.Keys.Contains(parentTransform))
             {
                 meshObject.GetComponent<Renderer>().material = m_JdController.bodyPartsDict[parentTransform].groundContact.touchingGround
@@ -496,7 +493,7 @@ public class WalkerRagdoll : MonoBehaviour
 
 
     /// <summary>
-    /// 储存新数据集中位置信息。包括walk（用到的姿态），footContact，endPosition，comPosition四个。
+    /// Store position data for the new dataset: walk (pose subset), footContact, endPosition, comPosition
     /// </summary>
     private void ImuData2logPosition()
     {
@@ -509,7 +506,7 @@ public class WalkerRagdoll : MonoBehaviour
         int count = 0;
         foreach (var trans in bodyEnd)
         {
-            Vector3 endPosition = trans.position-hips.position;//是相对根节点的位置，不是相对父节点的！
+            Vector3 endPosition = trans.position-hips.position;// relative to root, not parent
             imuData2.endPosition[i, count++] = endPosition.x;
             imuData2.endPosition[i, count++] = endPosition.y;
             imuData2.endPosition[i, count++] = endPosition.z;
@@ -532,10 +529,10 @@ public class WalkerRagdoll : MonoBehaviour
 
 
     /// <summary>
-    /// 由四元数变化计算角速度，输出速度单位为rad/s
+    /// Compute angular velocity from quaternion delta in rad/s
     /// </summary>
-    /// <param name="preRoation">上一帧</param>
-    /// <param name="thisRotation">当前的</param>
+    /// <param name="preRoation">previous frame</param>
+    /// <param name="thisRotation">current frame</param>
     /// <returns></returns>
     public Vector3 AngularVelocityCalculate(Quaternion preRoation, Quaternion thisRotation)
     {
@@ -554,12 +551,12 @@ public class WalkerRagdoll : MonoBehaviour
     }
 
     /// <summary>
-    /// 纠正旋转顺序。基于动作捕捉数据，求得绕根节点旋转四元数,旋转顺序XYZ
+    /// Correct rotation order. Based on mocap data, get quaternion rotating about the root in XYZ order
     /// </summary>
     /// <param name="angleX"></param>
     /// <param name="angleY"></param>
     /// <param name="angleZ"></param>
-    /// <returns>输出的旋转四元数</returns>
+    /// <returns>rotation quaternion</returns>
     private Quaternion AngleRoatation(float angleX, float angleY, float angleZ)
     {
         Quaternion RotationQ = Quaternion.Euler(new Vector3(angleX, 0, 0)) * Quaternion.Euler(new Vector3(0, angleY, 0)) * Quaternion.Euler(new Vector3(0, 0, angleZ));
@@ -568,12 +565,12 @@ public class WalkerRagdoll : MonoBehaviour
     }
 
     /// <summary>
-    /// 指定hip位置和8个关节的旋转角(载入数据集中的动作捕捉数据)，第i帧
+    /// Set hip position and rotations for 8 joints from mocap dataset for frame i
     /// </summary>
     private void MotionDataControl(float[,] motionData )
     {
-        if (showResult == false) MotionDataControlData1(motionData);//填入原始数据，角度信息
-        if (showResult == true) MotionDataControlData2(motionData);//填入物理处理后的数据，四元数信息
+        if (showResult == false) MotionDataControlData1(motionData);// use raw angle data
+        if (showResult == true) MotionDataControlData2(motionData);// use physics-adjusted quaternion data
         hips.position += midStartPosition;
 
         foreach (var bodyPart in m_JdController.bodyPartsDict.Values)
@@ -583,9 +580,9 @@ public class WalkerRagdoll : MonoBehaviour
         }
     }
 
-    private void MotionDataControlData1(float[,] motionData)//一共62维
+    private void MotionDataControlData1(float[,] motionData)// total 62 dims
     {
-        //hips的position是相对于初始位置的
+        // hip position is relative to initial pose
         hips.position = m_JdController.bodyPartsDict[hips].startingPos + Quaternion.AngleAxis(angleTowards, Vector3.up) * new Vector3(motionData[i, 0], motionData[i, 1], motionData[i, 2]);
         hips.rotation = m_JdController.bodyPartsDict[hips].startingRot * AngleRoatation(motionData[i, 3], -motionData[i, 4], -motionData[i, 5]);
 
@@ -600,7 +597,7 @@ public class WalkerRagdoll : MonoBehaviour
         footL.localRotation = m_JdController.bodyPartsDict[footL].startingLocalRot * AngleRoatation(motionData[i, 59], 0, -motionData[i, 60]);
     }
 
-    private void MotionDataControlData2(float[,] motionData)//一共35维
+    private void MotionDataControlData2(float[,] motionData)// total 35 dims
     {
         hips.position = m_JdController.bodyPartsDict[hips].startingPos + new Vector3(motionData[i, 0], motionData[i, 1], motionData[i, 2]);
 
@@ -611,7 +608,7 @@ public class WalkerRagdoll : MonoBehaviour
             if (trans == hips) trans.rotation = bodyAngle;
             else trans.localRotation = bodyAngle;
 
-            //用来给cube摆位置
+            // position the debug cube
             if (trans == hips)
             {
                 Vector3 position1 = trans.position + midStartPosition + new Vector3(1, 1, 1);
@@ -634,7 +631,7 @@ public class WalkerRagdoll : MonoBehaviour
         foreach (FileInfo f in file)
         {
             filename = f.FullName;
-            if (filename.EndsWith(suffix))//判断文件后缀，并获取指定格式的文件全路径增添至fileList
+            if (filename.EndsWith(suffix))// check suffix and add matching file path
             {
                 fileList.Add(filename);
             }
@@ -644,7 +641,7 @@ public class WalkerRagdoll : MonoBehaviour
 
 
     /// <summary>
-    /// 记录此刻全身姿态至JdController，包括rotation、postion（世界坐标系）和足部接触状态
+    /// Record current full-body pose to JdController: rotation, position (world space), and foot contact
     /// </summary>
     public void RecordJointPostureToController()
     {
@@ -652,10 +649,10 @@ public class WalkerRagdoll : MonoBehaviour
         foreach (var trans in m_JdController.bodyPartsDict.Keys)
         {
 
-            //更新位置（全局）
+            // update position (world)
             m_JdController.bodyPartsDict[trans].PrePosition = trans.position - new Vector3(0, height, 0);
 
-            //更新角度（全局）
+            // update rotation (world)
             m_JdController.bodyPartsDict[trans].PreRoation = trans.rotation;
          
         }
@@ -666,7 +663,7 @@ public class WalkerRagdoll : MonoBehaviour
     }
 
     /// <summary>
-    /// 更新每两步的步长和频率,改为直接用matlab数据，不在这里算了
+    /// Update step length/frequency; now read directly from MATLAB output instead of computing here
     /// </summary>
     private void UpdateStepInformation()
     {
@@ -682,27 +679,27 @@ public class WalkerRagdoll : MonoBehaviour
 
 
     /// <summary>
-    /// 更新bodypart中记录的线速度和角速度，用当前的和上一次RecordPosture()记录的算
+    /// Update linear/angular velocity in bodyPart using current pose and prior RecordPosture()
     /// </summary>
     private void RecordJointVelocityToController()
     {
         float height = Hipmove();
         foreach (var trans in m_JdController.bodyPartsDict.Keys)
         {
-           //线速度计算
+           // linear velocity
            m_JdController.bodyPartsDict[trans].velocity = (trans.position + new Vector3(0, -height, 0) - m_JdController.bodyPartsDict[trans].PrePosition) / Time.fixedDeltaTime;
 
-            //角速度计算
+            // angular velocity
             m_JdController.bodyPartsDict[trans].angularVelocity = AngularVelocityCalculate(m_JdController.bodyPartsDict[trans].PreRoation, trans.rotation);
         }
     }
 
     /// <summary>
-    /// 最后对数据进行滑动平均滤波
+    /// Apply moving-average smoothing to final data
     /// </summary>
     void FinalProcessing()
     {
-        //平滑数据
+        // smooth data
         imuData2.endPosition = Smooth2(imuData2.endPosition, 6);
         imuData2.comPosition = Smooth2(imuData2.comPosition, 6);
         imuData2.walk = Smooth2(imuData2.walk, 6);
@@ -715,7 +712,7 @@ public class WalkerRagdoll : MonoBehaviour
 
 
     /// <summary>
-    /// 滑动平均滤波
+    /// Moving average for binary contact
     /// </summary>
     /// <param name="data"></param>
     /// <param name=""></param>
@@ -766,7 +763,7 @@ public class WalkerRagdoll : MonoBehaviour
     }
 
     /// <summary>
-    /// 滑动平均滤波
+    /// Moving average smoothing
     /// </summary>
     /// <param name="data"></param>
     /// <param name=""></param>

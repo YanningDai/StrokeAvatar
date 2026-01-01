@@ -38,7 +38,6 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 1821108277}
-  m_IndirectSpecularColor: {r: 0.6817959, g: 0.7521824, b: 0.8234852, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -241,6 +240,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01614664b831546d2ae94a42149d80ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_SendPointerHoverToParent: 1
   m_MoveRepeatDelay: 0.5
   m_MoveRepeatRate: 0.1
   m_XRTrackingOrigin: {fileID: 0}
@@ -3344,13 +3344,7 @@ MonoBehaviour:
   Record: 0
   NumStepsToRecord: 160
   DemonstrationName: ControlDemo-60
-  DemonstrationDirectory: D:/UNITY/ml-agent/mlagent/Project/Assets/demos
---- !u!4 &1711495867318643942 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 7419793953413399281, guid: 57de928fb569c9442a32cf5678c1edfd,
-    type: 3}
-  m_PrefabInstance: {fileID: 8158291777130835479}
-  m_PrefabAsset: {fileID: 0}
+  DemonstrationDirectory: Assets/demos
 --- !u!33 &2742805786916694743
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3807,7 +3801,6 @@ Transform:
   - {fileID: 2772108353588745989}
   - {fileID: 2772095670806270387}
   - {fileID: 6956590106650837820}
-  - {fileID: 1711495867318643942}
   m_Father: {fileID: 0}
   m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4422,6 +4415,7 @@ GameObject:
   - component: {fileID: 732214686038256640}
   - component: {fileID: 732214686038256643}
   - component: {fileID: 732214686038256646}
+  - component: {fileID: 6956590106650837823}
   m_Layer: 0
   m_Name: WalkerRagdoll2
   m_TagString: agent
@@ -4452,11 +4446,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6956590106650837797}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3dfd1201a93bba641a9de0d2010e6c82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  groundedMaterial: {fileID: 0}
+  unGroundedMaterial: {fileID: 0}
+  cube: {fileID: 0}
   hips: {fileID: 6956590106739035658}
   chest: {fileID: 215860616763557897}
   spine: {fileID: 215860616839157367}
@@ -4473,7 +4470,14 @@ MonoBehaviour:
   armR: {fileID: 215860616438721868}
   forearmR: {fileID: 215860616120054330}
   handR: {fileID: 215860617005337904}
+  FootMeshL: {fileID: 0}
+  FootMeshR: {fileID: 0}
   fileNum: 0
+  midStartPosition: {x: 0, y: 0, z: 0}
+  framerate: 0
+  physicsLimit: 0
+  adjustFrame: 0
+  showResult: 0
 --- !u!114 &6956590106650837822
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4486,30 +4490,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 297f418373944434c8dab587324c2035, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &6956590106650837823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6956590106650837797}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88b6042bc9a5d4aa58d931eae49442e5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   agentParameters:
     maxStep: 0
   hasUpgradedFromAgentParameters: 1
   MaxStep: 0
-  framerate: 30
-  flagLogJson: 0
-  hips: {fileID: 6956590106739035658}
-  chest: {fileID: 215860616763557897}
-  spine: {fileID: 215860616839157367}
-  head: {fileID: 215860615387852548}
-  thighL: {fileID: 215860616221159655}
-  shinL: {fileID: 215860616197964474}
-  footL: {fileID: 215860616731112867}
-  thighR: {fileID: 215860615631935951}
-  shinR: {fileID: 215860615628572866}
-  footR: {fileID: 215860615773564136}
-  armL: {fileID: 215860616289455274}
-  forearmL: {fileID: 215860616230752633}
-  handL: {fileID: 215860616299529525}
-  armR: {fileID: 215860616438721868}
-  forearmR: {fileID: 215860616120054330}
-  handR: {fileID: 215860617005337904}
-  velocityRange: 100
-  fileNum: 0
 --- !u!23 &6956590106700277570
 MeshRenderer:
   m_ObjectHideFlags: 0

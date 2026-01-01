@@ -9,13 +9,13 @@ using Unity.MLAgents.Sensors;
 using System.Collections.Generic;
 using System.Linq;
 
-/// 正式模型，分为录制demo和测试两部分（包括RL+BC+GAIL）
+/// Motion prediction model: supports demo recording and testing (RL + BC + GAIL)
 public class StrokeWalker : Agent
 {
 
     private float framerate = 30;
     /// <summary>
-    /// 如果是，则载入json文件中的observation和action，录制demo（始终站在原地，在heristic模式下用）
+    /// When true, load observation/action from json and record demo (stay in place; used in heuristic mode)
     /// </summary>
     public bool flagDemo;
     public Transform Target;
@@ -38,11 +38,11 @@ public class StrokeWalker : Agent
     public Transform handR;
 
     private JointDriveController m_JdController;
-    public StatsRecorder statsRecorder;//tensorboard输出
+    public StatsRecorder statsRecorder;// tensorboard output
     private string dirOut;
     private JsonDataLog jsonDataLog;
 
-    //记录训练后inference内容的列表
+    // logs from inference after training
     private List<List<float>> observationLogList;
     private List<List<float>> actionLogList;
     private int jsonN;
@@ -53,32 +53,31 @@ public class StrokeWalker : Agent
     private float averVelocityHip;
 
     /// <summary>
-    /// 目标速度，用户输入,应该是（1-2,0,0）左右
+    /// Target speed input by user (around (1-2,0,0))
     /// </summary>
     public float targetVelocity;
-    private float velGoal;//实际使用的速度
+    private float velGoal;// actual target speed
     /// <summary>
-    /// 是否随机目标速度，训练时为true，inference时为false
+    /// Randomize target speed; true during training, false during inference
     /// </summary>
     public bool randomizeWalkSpeedEachEpisode;
 
-    private int step;//记录位于episode的第几步
-    public int velocityRange; //计算平均速度时取多少个点，默认100
+    private int step;// step index within episode
+    public int velocityRange; // number of frames used for average speed (default 100)
     private List<float> positionlist;
     float averVelocity;
 
-    float dataV;//demo数据中的最后一帧的目标速度
+    float dataV;// target speed from last demo frame
     int keyini;int keyend;
-    int KeyPhaseNum;//当前进行到自己的第几个，如1-27
-    int KeyPhaseTotal;//一共用几帧，如27，数据集中是37
-    int KeyPhase;//当前用数据集中第几帧，如30
+    int KeyPhaseNum;// current phase index (e.g., 1-27)
+    int KeyPhaseTotal;// number of phases used (e.g., 27; dataset has 37)
+    int KeyPhase;// current dataset frame index (e.g., 30)
 
     protected override void Awake()
     {
         base.Awake();
-        statsRecorder = Academy.Instance.StatsRecorder;//tensorboard输出
-        //一次只录制一组动作。如果需要更多，在这个脚本里改，加一个计数
-        dirOut = "D:/UNITY/ml-agent/mlagent/Project/Assets/ObserAction/walk73.json";
+        statsRecorder = Academy.Instance.StatsRecorder;// tensorboard output
+        dirOut = Path.Combine(Application.dataPath, "ObserAction/walk73.json");
         Application.targetFrameRate = 30;
 
         keyini = 6;keyend = 40;
@@ -87,7 +86,7 @@ public class StrokeWalker : Agent
 
     public override void Initialize()
     {
-        Time.fixedDeltaTime = 1.0f / framerate;//物理帧时长
+        Time.fixedDeltaTime = 1.0f / framerate;// physics fixed timestep
 
         //Setup each body part
         m_JdController = GetComponent<JointDriveController>();
@@ -113,24 +112,24 @@ public class StrokeWalker : Agent
             bodyPart.Reset(bodyPart);
         }
 
-        //读取json文件
+        // Read json file
         jsonDataLog = JsonConvert.DeserializeObject<JsonDataLog>(File.ReadAllText(@dirOut));
-        observationLogList = jsonDataLog.observationLog;//这些都是按30hz保存的
+        observationLogList = jsonDataLog.observationLog;// stored at 30 Hz
         actionLogList = jsonDataLog.actionLog;
-        dataV = observationLogList[observationLogList.Count - 1][4];//目标速度（对本demo是固定的）
+        dataV = observationLogList[observationLogList.Count - 1][4];// target speed (fixed for this demo)
 
     }
 
 
     public override void OnEpisodeBegin()
     {
-        //初始化角色姿态
+        // Initialize pose
         foreach (var bodyPart in m_JdController.bodyPartsDict.Values)
         {
             bodyPart.Reset(bodyPart);
         }
 
-        //实际使用的目标速度
+        // Resolve target speed
         velGoal = randomizeWalkSpeedEachEpisode ? UnityEngine.Random.Range(0.3f, 2) : targetVelocity;
         velGoal = 1.5f;
         IniFootHeightLeft = FootHeight(footL);
@@ -138,15 +137,15 @@ public class StrokeWalker : Agent
         IniHipHeight = FootHeight(hips);
         jsonN = 0;
 
-        RecordPosture();//记录当前rotation和postion（世界坐标系）
+        RecordPosture();// record current rotation/position (world space)
 
-        //记录速度相关
+        // Initialize speed tracking
         positionlist = new List<float>();
         positionlist.Add(m_JdController.bodyPartsDict[hips].startingPos.x);
         averVelocity = 0;
         step = 1;
         KeyPhaseNum = 0;
-        KeyPhaseTotal = (int)Math.Round(dataV / targetVelocity * (keyend - keyini + 1), 0);//数据集中是37对应于这个速度的几帧
+        KeyPhaseTotal = (int)Math.Round(dataV / targetVelocity * (keyend - keyini + 1), 0);// dataset has 37 frames for this speed
     }
 
 
@@ -154,99 +153,99 @@ public class StrokeWalker : Agent
     {
         positionlist.Add(hips.position.x);
 
-        if (flagDemo)//录demo
+        if (flagDemo)// record demo
         {
             int n = 0;
             Vector3 vectorTem; Quaternion qTem; float floatTem; bool boolTem;
 
-            //（hip离地高度-初始值）/最大高度, float，1
+            //(hip height above ground - initial)/max height, float, 1
             floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
-            //Debug.Log("（hip离地高度-初始值）/最大高度" + floatTem);
+            //Debug.Log("(hip height delta)/max " + floatTem);
 
-            //（脚离地高度-初始值）/最大高度，float，2
+            //(foot height above ground - initial)/max height, float, 2
             floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
             floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
-            //Debug.Log("（脚离地高度-初始值）/最大高度" + floatTem);
+            //Debug.Log("(foot height delta)/max " + floatTem);
 
-            //目标速度-一段时间的平均速度，float，1
+            // target speed - average speed over window, float, 1
             floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
-            //Debug.Log("（目标速度-平均速度）/目标速度" + floatTem);
+            //Debug.Log("(target speed - avg)/target speed " + floatTem);
 
-            //目标速度，float,1
+            // target speed, float, 1
             floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
 
-            //身体朝向与目标方向之差，quaternion,4
+            // body forward vs target direction diff, quaternion, 4
             qTem = new Quaternion(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
             sensor.AddObservation(qTem);
-            //Debug.Log("身体朝向与目标方向之差" + qTem);
+            //Debug.Log("Body forward vs target diff " + qTem);
 
-            //脚是否接触地面，bool，2
+            // foot-ground contact, bool, 2
             floatTem = observationLogList[jsonN][n++]; if (floatTem == 1) { boolTem = true; } else { boolTem = false; }
             sensor.AddObservation(boolTem);
-            //Debug.Log("左脚" + boolTem);
+            //Debug.Log("Left foot " + boolTem);
             floatTem = observationLogList[jsonN][n++]; if (floatTem == 1) { boolTem = true; } else { boolTem = false; }
             sensor.AddObservation(boolTem);
-            //Debug.Log("右脚" + boolTem);
+            //Debug.Log("Right foot " + boolTem);
 
-            //加入各关节信息
-            //先加hips的,4+3+3=10
+            // Add joint info
+            // hips first: 4+3+3=10
 
-            //全局旋转四元数，quaternion,4
+            // global rotation quaternion, 4
             qTem = new Quaternion(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
             sensor.AddObservation(qTem);
-            //Debug.Log("hip旋转" + qTem);
+            //Debug.Log("Hip rotation " + qTem);
 
-            //线速度，Vector3，3
+            // linear velocity, Vector3, 3
             vectorTem = new Vector3(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
             sensor.AddObservation(vectorTem);
-            //Debug.Log("线速度" + vectorTem);
+            //Debug.Log("Linear velocity " + vectorTem);
 
-            //角速度，Vector3，3
+            // angular velocity, Vector3, 3
             vectorTem = new Vector3(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
             sensor.AddObservation(vectorTem);
-            //Debug.Log("角速度" + vectorTem);
+            //Debug.Log("Angular velocity " + vectorTem);
 
             for (int m = 0; m < 8; m++)
             {
-                //localrotation四元数，4
+                // local rotation quaternion, 4
                 qTem = new Quaternion(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
                 sensor.AddObservation(qTem);
-                //Debug.Log("localrotation四元数" + qTem);
+                //Debug.Log("local rotation quaternion " + qTem);
 
-                //线速度,3
+                // linear velocity, 3
                 vectorTem = new Vector3(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
                 sensor.AddObservation(vectorTem);
-                //Debug.Log("线速度" + vectorTem);
+                //Debug.Log("Linear velocity " + vectorTem);
 
-                //角速度,3
+                // angular velocity, 3
                 vectorTem = new Vector3(observationLogList[jsonN][n++], observationLogList[jsonN][n++], observationLogList[jsonN][n++]);
                 sensor.AddObservation(vectorTem);
-                //Debug.Log("角速度" + vectorTem);
+                //Debug.Log("Angular velocity " + vectorTem);
 
-                //扭矩上限,1
+                // torque limit, 1
                 floatTem = observationLogList[jsonN][n++]; sensor.AddObservation(floatTem);
-                //Debug.Log("扭矩上限" + floatTem);
+                //Debug.Log("Torque limit " + floatTem);
             }
-            //因为不setposture，就每一帧都归一次零，防止摔倒
+            // Because we skip SetPosture, reset each frame to avoid falling
             foreach (var bodyPart in m_JdController.bodyPartsDict.Values)
             { bodyPart.Reset(bodyPart); }
-            //一共109个
+            // total 109 values
         }
 
-        else//正式运行，共109
+        else// normal run, total 109
         {
             JointVelocityCalculate();
 
-            //（hip离地高度-初始值）/最大高度, float，1
+            //(hip height above ground - initial) / max height, float, 1
             sensor.AddObservation((FootHeight(hips) - IniHipHeight) / 0.01f);
 
-            //（脚离地高度-初始值）/最大高度，float，2
+            //(foot height above ground - initial)/max height, float, 2
             sensor.AddObservation(Math.Max(0, FootHeight(footL) - IniFootHeightLeft) / 0.3f);
             sensor.AddObservation(Math.Max(0, FootHeight(footR) - IniFootHeightRight) / 0.3f);
 
-            // 目标速度-一段时间的平均速度，float，1
+            // target speed - average speed over window, float, 1
             int init;
-            if (step > velocityRange) { init = step - velocityRange; } else { init = 0; }//init为计时的初始位置
+            if (step > velocityRange) { init = step - velocityRange; } else { init = 0; }// init is window start
             averVelocityHip = (hips.position.x - positionlist[init]) / (1.0f / framerate * (step - init));
 
             averVelocity = 0;int q = 0;
@@ -259,40 +258,40 @@ public class StrokeWalker : Agent
 
             sensor.AddObservation(velGoal - averVelocityHip);
 
-            //目标速度，float,1
+            // target speed, float, 1
             sensor.AddObservation(velGoal);
 
-            //身体朝向与目标方向之差，quaternion,4
+            // body forward vs target direction diff, quaternion, 4
             Vector3 bodyForward = (spine.forward + chest.forward) / 2;
             Vector3 bodyForwardGoal = Vector3.right;
             sensor.AddObservation(Quaternion.FromToRotation(bodyForward, bodyForwardGoal));
 
-            //脚是否接触地面，bool，2
+            // foot-ground contact, bool, 2
             sensor.AddObservation(m_JdController.bodyPartsDict[footL].groundContact.touchingGround);
             sensor.AddObservation(m_JdController.bodyPartsDict[footR].groundContact.touchingGround);
 
-            //加入各关节信息
+            // Append per-joint info
             var bpDict = m_JdController.bodyPartsDict;
             List<BodyPart> bpList = new List<BodyPart>() { bpDict[chest], bpDict[spine], bpDict[thighL], bpDict[shinL], bpDict[footL], bpDict[thighR], bpDict[shinR], bpDict[footR] };
 
-            //先加hips的,4+3+3=10
-            //全局旋转四元数，quaternion,4
+            // hips first: 4+3+3=10
+            // global rotation quaternion, 4
             sensor.AddObservation(hips.rotation);
-            //线速度，Vector3，3
+            // linear velocity, Vector3, 3
             sensor.AddObservation(bpDict[hips].velocity);
-            //角速度，Vector3，3
+            // angular velocity, Vector3, 3
             sensor.AddObservation(bpDict[hips].angularVelocity);
 
             foreach (var bp in bpList)
-            {//一共8个关节，每个有4+3+3+1=11
+            {// total 8 joints, each has 4+3+3+1=11
                 Transform trans = bp.rb.GetComponent<Transform>();
-                //localrotation，quaternion, 4
+                // local rotation, quaternion, 4
                 sensor.AddObservation(trans.localRotation);
-                //线速度,Vector3，3
+                // linear velocity, Vector3, 3
                 sensor.AddObservation(bp.velocity);
-                //角速度,Vector3，3
+                // angular velocity, Vector3, 3
                 sensor.AddObservation(bp.angularVelocity);
-                //扭矩上限,float, 1
+                // torque limit, float, 1
                 sensor.AddObservation(bp.currentStrength / m_JdController.maxJointForceLimit);
 
             }
@@ -300,7 +299,7 @@ public class StrokeWalker : Agent
     }
 
     /// <summary>
-    /// action函数，这个对各个脚本都一致
+    /// Action function (shared across scripts)
     /// </summary>
     /// <param name="actions"></param>
     public override void OnActionReceived(ActionBuffers actions)
@@ -331,20 +330,20 @@ public class StrokeWalker : Agent
 
         TotalRewardCalculate();
 
-        //在最后记录各种状态
+        // Record state at end
         RecordPosture();
 
 
-        if (Math.Abs(hips.position.x - Target.position.x) < 1)//快到目标就停止
+        if (Math.Abs(hips.position.x - Target.position.x) < 1)// stop near target
         {
             SetReward(1);
-            Debug.Log("到达目标");
+            Debug.Log("Reached target");
             EndEpisode();
         }
-        if (hips.position.y < bpDict[hips].startingPos.y - 2)//摔下去就停止
+        if (hips.position.y < bpDict[hips].startingPos.y - 2)// stop if fallen
         {
             SetReward(-1);
-            Debug.Log("摔下平台");
+            Debug.Log("Fell off platform");
             EndEpisode(); }
         step++;
         
@@ -354,7 +353,7 @@ public class StrokeWalker : Agent
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var continuousActions = actionsOut.ContinuousActions;
-        if (flagDemo)//填入action
+        if (flagDemo)// fill actions from demo
         {
             for (int n = 0; n < continuousActions.Length; n++)
             {
@@ -364,9 +363,9 @@ public class StrokeWalker : Agent
 
             if (jsonN == actionLogList.Count)
             {
-                Debug.Log("demo录制结束 "+ jsonN);
+                Debug.Log("Demo recording complete "+ jsonN);
                 jsonN = 0;
-                //录制过程好像没法结束EndEpisode();
+                // Recording cannot call EndEpisode here
             }
         }
         else
@@ -379,7 +378,7 @@ public class StrokeWalker : Agent
     }
 
     /// <summary>
-    /// 用于加奖励
+    /// Reward calculation
     /// </summary>
     public void TotalRewardCalculate()
     {
@@ -388,35 +387,35 @@ public class StrokeWalker : Agent
         //float walkAbilityReward;
         float keyFrameReward;
 
-        float hipHeightReward;//hip高度与地形高度一致
-        float towardsReward;//方向一致
-        float velocityReward;//速度一致
-        float bodyStableReward;//身体稳
-        float footDragPenal;//不拖地
+        float hipHeightReward;// hip height matches terrain
+        float towardsReward;// facing consistency
+        float velocityReward;// speed consistency
+        float bodyStableReward;// body stability
+        float footDragPenal;// no dragging
         float walklengthReward;
         float keyHipHightReward;
         float keyHipRotReward;
         float keyRotReward = 0;
         float positionReward = 0;
 
-        // 1: 任务完成水平（包括走地形、方向、速度）-------------------------------------------------------------------------
-        // 1.1 hip高度与地形高度一致
+        // 1: Task performance (terrain, direction, speed) -----------------------------------------
+        // 1.1 hip height matches terrain
         var delatHeight = Mathf.Clamp(Mathf.Abs(FootHeight(hips) - IniHipHeight), 0.15f, 2)/0.2f;
         hipHeightReward = (float)Math.Exp(-delatHeight * delatHeight); 
 
-        // 1.2 方向一致,用点乘衡量
+        // 1.2 Direction alignment (dot-product based)
         Vector3 bodyForward = (spine.forward + hips.forward + chest.forward) / 3;
         Vector3 bodyUpward = (spine.up + hips.up + chest.up) / 3;
         //towardsReward = ((Vector3.Dot(bodyForward, Vector3.right) + 1) * 0.5f)*((Vector3.Dot(bodyUpward, Vector3.up) + 1) * 0.5f);
         towardsReward = (float)Math.Exp(-bodyForward.y * bodyForward.y)* (float)Math.Exp(-bodyForward.z * bodyForward.z);
         towardsReward *= (float)Math.Exp(-bodyUpward.z * bodyUpward.z) * (float)Math.Exp(-bodyUpward.z * bodyUpward.z);
 
-        // 1.3 速度一致，用误差占比------改为全身平均速度*hip的100个点的速度
+        // 1.3 Speed alignment; use avg body speed and hip speed over 100 frames
         float deltaV = (velGoal - averVelocity)/0.8f; float deltaVHip = (velGoal - averVelocityHip) / 0.8f;
         velocityReward = (float)Math.Exp(-deltaV * deltaV)* (float)Math.Exp(-deltaVHip * deltaVHip);
         //Debug.Log("deltaV: "+ deltaV + " deltaVHip: " + deltaVHip);
 
-        //1.4 位置一致
+        //1.4 Position alignment
         float deltaP = (velGoal/framerate*step + m_JdController.bodyPartsDict[hips].startingPos.x-hips.position.x) / 0.2f;
         positionReward = (float)Math.Exp(-deltaP * deltaP);
         //Debug.Log(positionReward);
@@ -426,49 +425,49 @@ public class StrokeWalker : Agent
 
         //Debug.Log("hipHeightReward: "+ hipHeightReward + " towardsReward: "+ towardsReward + " velocityReward: " + velocityReward);
 
-        // 2: 行走水平（双脚触地、脚步不拖行、走得远）------------------------------------------------------------------------
-        // 2.1 脚着地
+        // 2: Walking quality (foot contact, no dragging, distance) -------------------------------
+        // 2.1 Foot contact
         if (m_JdController.bodyPartsDict[footL].groundContact.touchingGround && !m_JdController.bodyPartsDict[footR].groundContact.touchingGround)
         { bodyStableReward = -0.005f; }
         else
         { bodyStableReward = 0;}   
-        // 2.2 不拖地
-        footDragPenal = FootDrag();//不着地时为零，拖动时为负值
-        // 2.3 走得远
+        // 2.2 No dragging
+        footDragPenal = FootDrag();// zero when airborne; negative when dragging
+        // 2.3 Cover distance
         walklengthReward = 0.005f;
 
         //walkAbilityReward = bodyStableReward + footDragPenal + walklengthReward;
         //Debug.Log("bodyStableReward(未触地): " + bodyStableReward + " footDragPenal: " + footDragPenal + " walklengthReward: " + walklengthReward);
 
 
-        // 3：关键帧动作相似度------------------------------------------------------------------------
-        KeyPhase = keyini + (int)Math.Round((double)(keyend - keyini + 1) / KeyPhaseTotal * KeyPhaseNum, 0);//当前用数据集中第几帧，如30
-        //Debug.Log("KeyPhaseTotal转化后帧数" + KeyPhaseTotal + "  KeyPhase当前帧" + KeyPhase);
+        // 3: Keyframe motion similarity ---------------------------------------------------------
+        KeyPhase = keyini + (int)Math.Round((double)(keyend - keyini + 1) / KeyPhaseTotal * KeyPhaseNum, 0);// dataset frame index in use, e.g., 30
+        //Debug.Log("KeyPhaseTotal frames after conversion " + KeyPhaseTotal + "  current KeyPhase frame " + KeyPhase);
 
-        // 3.1 hip高度+足部高度
-        float datahip = observationLogList[KeyPhase][0]*0.01f+IniHipHeight;//demo中的离地高度
+        // 3.1 Hip height + foot height
+        float datahip = observationLogList[KeyPhase][0]*0.01f+IniHipHeight;// demo ground clearance
         var delta1 = (FootHeight(hips) - datahip) / 0.4f;
         keyHipHightReward = (float)Math.Exp(-delta1 * delta1);
-        //Debug.Log("数据集中离地高度" + datahip +"当前离地高度"+ FootHeight(hips) + "  keyHipHightReward" + keyHipHightReward);
+        //Debug.Log("Dataset hip height " + datahip +" current hip height " + FootHeight(hips) + "  keyHipHightReward " + keyHipHightReward);
 
  
-        //换为足部高度试一下
-        datahip = observationLogList[KeyPhase][1] * 0.3f + IniFootHeightLeft;//demo中的离地高度
+        // Try using foot heights
+        datahip = observationLogList[KeyPhase][1] * 0.3f + IniFootHeightLeft;// demo ground clearance
         delta1 = (FootHeight(hips) - datahip) / 0.4f;
         keyHipHightReward += (float)Math.Exp(-delta1 * delta1);
-        datahip = observationLogList[KeyPhase][2] * 0.3f + IniFootHeightRight;//demo中的离地高度
+        datahip = observationLogList[KeyPhase][2] * 0.3f + IniFootHeightRight;// demo ground clearance
         delta1 = (FootHeight(hips) - datahip) / 0.4f;
         keyHipHightReward += (float)Math.Exp(-delta1 * delta1);
-        //Debug.Log("数据集中离地高度" + datahip + "当前离地高度"+ FootHeight(footR) + "  keyHipHightReward" + keyHipHightReward);
+        //Debug.Log("Dataset hip height " + datahip + " current hip height " + FootHeight(footR) + "  keyHipHightReward " + keyHipHightReward);
 
 
-        // 3.2 hip旋转角
+        // 3.2 Hip rotation
         Quaternion datahipR = new Quaternion(observationLogList[KeyPhase][11], observationLogList[KeyPhase][12], observationLogList[KeyPhase][13], observationLogList[KeyPhase][14]);
         var DeltaMagnitude = DeltaAngle(datahipR.eulerAngles, hips.rotation.eulerAngles) / 8;
         keyHipRotReward = (float)Math.Exp(-DeltaMagnitude * DeltaMagnitude);
-        //Debug.Log("数据集中旋转角" + datahipR.eulerAngles + "当前旋转角"+ hips.rotation.eulerAngles + "  keyHipRotReward" + keyHipRotReward);
+        //Debug.Log("Dataset rotation angle " + datahipR.eulerAngles + " current rotation angle " + hips.rotation.eulerAngles + "  keyHipRotReward " + keyHipRotReward);
 
-        // 3.3 其余关节旋转角
+        // 3.3 Other joint rotations
         var bpDict = m_JdController.bodyPartsDict;
         List<BodyPart> bpList = new List<BodyPart>() { bpDict[chest], bpDict[spine], bpDict[thighL], bpDict[shinL], bpDict[footL], bpDict[thighR], bpDict[shinR], bpDict[footR] };
         int numBp = 21; 
@@ -486,8 +485,8 @@ public class StrokeWalker : Agent
         if (step == 1) { keyRotReward = 0; }
         keyFrameReward = (keyHipHightReward + keyHipRotReward + keyRotReward) /11; 
 
-        KeyPhaseNum++;//当前进行到自己的第几个，如1-27，每次加一
-        if (KeyPhaseNum == KeyPhaseTotal)//当前phase结束
+        KeyPhaseNum++;// advance current phase index
+        if (KeyPhaseNum == KeyPhaseTotal)// phase complete
         { KeyPhaseNum = 0; }
 
         //totalReward = 0.3f*goalReward + 0.2f*walkAbilityReward + 0.5f * keyFrameReward;
@@ -514,7 +513,7 @@ public class StrokeWalker : Agent
 
 
     /// <summary>
-    /// 范围0-1，不拖地时为1
+    /// Range 0-1; equals 1 when not dragging
     /// </summary>
     /// <returns></returns>
     private float FootDrag()
@@ -537,22 +536,22 @@ public class StrokeWalker : Agent
 
 
     /// <summary>
-    /// 更新bodypart中记录的线速度和角速度
+    /// Update stored linear and angular velocity per body part
     /// </summary>
     private void JointVelocityCalculate()
     {
         foreach (var trans in m_JdController.bodyPartsDict.Keys)
-        {//一共9个关节，因为都是全局，所以hip不用单独说
-            if (trans != head && trans != handL && trans != handR && trans != forearmL && trans != forearmR && trans != armR && trans != armL)//放弃左右手
+        {// total 9 joints; all in world frame, hip not special-cased
+            if (trans != head && trans != handL && trans != handR && trans != forearmL && trans != forearmR && trans != armR && trans != armL)// skip arms/hands
             {
-                //线速度计算
+                // linear velocity
                 m_JdController.bodyPartsDict[trans].velocity = (trans.position - m_JdController.bodyPartsDict[trans].PrePosition) / Time.fixedDeltaTime;
-                //角速度计算
+                // angular velocity
                 m_JdController.bodyPartsDict[trans].angularVelocity = AngularVelocityCalculate(m_JdController.bodyPartsDict[trans].PreRoation, trans.rotation);
             }
         }
 
-        //在这里加一下上肢动作消除
+        // Zero upper-limb motion here
         armR.localRotation = m_JdController.bodyPartsDict[armR].startingLocalRot;
         forearmR.localRotation = m_JdController.bodyPartsDict[forearmR].startingLocalRot;
         handR.localRotation = m_JdController.bodyPartsDict[handR].startingLocalRot;
@@ -564,21 +563,21 @@ public class StrokeWalker : Agent
 
 
     /// <summary>
-    /// 计算脚离地高度
+    /// Compute foot height above ground
     /// </summary>
     /// <param name="foot"></param>
     /// <returns></returns>
     public float FootHeight(Transform foot)
     {
-        RaycastHit[] hit;//检测射线碰撞
+        RaycastHit[] hit;// raycast hits
 
         float rayDistance = 0;
 
-        hit = Physics.RaycastAll(foot.position, Vector3.down, 500f, ~(1 << 0));//有碰撞物体
+        hit = Physics.RaycastAll(foot.position, Vector3.down, 500f, ~(1 << 0));// with collisions
 
         for (int c = 0; c < hit.Length; c++)
         {
-            if (hit[c].collider.gameObject.CompareTag("ground"))//碰撞物体为地面
+            if (hit[c].collider.gameObject.CompareTag("ground"))// collider is ground
             { rayDistance = hit[0].distance; }
         }
 
@@ -587,7 +586,7 @@ public class StrokeWalker : Agent
     }
 
     /// <summary>
-    /// 由四元数变化计算角速度，输出速度单位为rad/s
+    /// Compute angular velocity from quaternion delta in rad/s
     /// </summary>
     /// <param name="lastRoation"></param>
     /// <param name="thisRotation"></param>
@@ -608,7 +607,7 @@ public class StrokeWalker : Agent
 
 
     /// <summary>
-    /// 记录全身姿态，包括当前rotation和postion（世界坐标系）
+    /// Record full-body pose: current rotation and position (world space)
     /// </summary>
     public void RecordPosture()
     {
@@ -616,10 +615,10 @@ public class StrokeWalker : Agent
         {
             if (trans != head)
             {
-                //更新位置（全局）
+                // update position (world)
                 m_JdController.bodyPartsDict[trans].PrePosition = trans.position;
 
-                //更新角度（全局）
+                // update rotation (world)
                 m_JdController.bodyPartsDict[trans].PreRoation = trans.rotation;
             }
         }
@@ -631,7 +630,7 @@ public class StrokeWalker : Agent
 
 
     /// <summary>
-    /// 计算两个旋转间差距，返回欧拉角距离的模长
+    /// Compute difference between two rotations; return magnitude of Euler delta
     /// </summary>
     /// <param name="eulerIn"></param>
     /// <returns></returns>

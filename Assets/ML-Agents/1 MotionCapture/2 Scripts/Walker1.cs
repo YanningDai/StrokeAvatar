@@ -232,7 +232,6 @@ public class Walker1 : Agent
 
         m_OrientationCube.UpdateOrientation(hips, target);
 
-        // 碰到目标结束训练
         if ((target.position - hips.position).magnitude < 2)
         { EndEpisode(); }
 

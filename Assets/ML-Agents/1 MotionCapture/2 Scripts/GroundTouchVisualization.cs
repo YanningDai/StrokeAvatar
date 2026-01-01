@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 挂载在mesh文件上，触地就改变颜色
+/// Attach to mesh object, changes color on ground contact
 /// </summary>
 public class GroundTouchVisualization : MonoBehaviour
 {

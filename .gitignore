@@ -8,7 +8,10 @@
 /Assets/Plugins*
 /Assets/Demonstrations*
 /Assets/ML-Agents/Timers*
+/Assets/ML-Agents/TestScenes*
 /csharp_timers.json
+UserSettings/
+Assets/ML-Agents/Editor/Tests*
 
 # Environemnt logfile
 *Project.log
@@ -31,7 +34,6 @@
 *.svd
 *.pdb
 *.DotSettings
-*.dll
 
 # Unity3D generated meta files
 *.pidb.meta
@@ -68,5 +70,8 @@
 
 # VSCode hidden files
 *.vscode/
+.vsconfig
+app.config
+packages.config
 
 .DS_Store

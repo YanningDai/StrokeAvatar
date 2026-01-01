@@ -38,7 +38,6 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 1821108277}
-  m_IndirectSpecularColor: {r: 0.6817959, g: 0.7521824, b: 0.8234852, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -2422,6 +2421,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 0
   m_SortingLayerID: 0
   m_SortingOrder: 0
@@ -2653,6 +2653,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01614664b831546d2ae94a42149d80ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_SendPointerHoverToParent: 1
   m_MoveRepeatDelay: 0.5
   m_MoveRepeatRate: 0.1
   m_XRTrackingOrigin: {fileID: 0}
@@ -5176,6 +5177,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967291
   m_ObservationStacks: 3
+  m_AlternatingRayOrder: 1
   rayHitColor: {r: 1, g: 0, b: 0, a: 1}
   rayMissColor: {r: 1, g: 1, b: 1, a: 1}
   m_StartVerticalOffset: 1.25
@@ -6582,14 +6584,24 @@ MonoBehaviour:
   randomizeWalkSpeedEachEpisode: 1
   lengthInput: 1.5096
   velocityInput: 0.8
+  velocityRange: 50
+  fai: 0
+  averVelocity: 0
+  averComVelocity: {x: 0, y: 0, z: 0}
+  currentLength: 0
+  velocityGoal: 0
+  lengthGoal: 0
+  freGoal: 0
+  iDataset: 0
+  clipLengthDataset: 0
+  clipLengthImitation: 0
+  dirPatient: 
   hips: {fileID: 794332166}
   spine: {fileID: 810038444}
   thighL: {fileID: 593668548}
   shinL: {fileID: 1754295036}
   thighR: {fileID: 2114382726}
   shinR: {fileID: 1459681900}
-  fai: 0
-  velocityRange: 50
   hipsRef: {fileID: 863931868}
   spineRef: {fileID: 2056225395}
   thighLRef: {fileID: 105000933}

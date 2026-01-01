@@ -12,9 +12,7 @@ using System.Linq;
 using static WalkerRagdoll;
 using Random = UnityEngine.Random;
 
-//2.17记录：正式Imiatation模型，开始的时候模仿的是指定数据集中的一个序列；之后把训练好的模型继续训练，模仿的是患者的一个
-//注：如果只设速度目标，就模仿一个序列，自动改变速度；如果还有步长目标，就选择最像的序列
-//最后有时间的话，再加上病人会选择reward最高的那个来模仿
+// Imitation model: initially mimics a specific sequence from the dataset; after training, continues on a patient sequence
 
 public class Imitation : Agent
 {
@@ -24,46 +22,46 @@ public class Imitation : Agent
 
     private float iniHipHeight;
     /// <summary>
-    /// 需要根据是否触地来改变颜色的object
+    /// Objects that change color based on ground contact
     /// </summary>
     private GameObject[] meshChangeObject;
     public Material groundedMaterial;
     public Material unGroundedMaterial;
 
     /// <summary>
-    /// 记录每个文件对应步长的字典，key是步长，value是文件名
+    /// Dictionary mapping step length to file name
     /// </summary>
     [HideInInspector] public Dictionary<float, string> fileStepLength;
     /// <summary>
-    /// 全部的json文件名字符串
+    /// List of all JSON file names
     /// </summary>
     private List<string> fileList;
     /// <summary>
-    /// 当前所用的json文件地址
+    /// Path of the current JSON file
     /// </summary>
     private string jsonDir;
 
     [Header("User Input Goal")]
     /// <summary>
-    /// 是否随机目标步长，训练时为true，inference时为false
+    /// Randomize target step length (true during training, false during inference)
     /// </summary>
     public bool randomizeWalkLengthEachEpisode;
     /// <summary>
-    /// 是否随机目标速度，训练时为true，inference时为false
+    /// Randomize target speed (true during training, false during inference)
     /// </summary>
     public bool randomizeWalkSpeedEachEpisode;
     /// <summary>
-    /// 用户输入的目标步幅（2步的，应该是0.7-2？根据数据集来定）
+    /// User-input target step length for two steps (~0.7-2, dataset dependent)
     /// </summary>
     public float lengthInput;
     /// <summary>
-    /// 用户输入的目标速度,应该是（1-2）
+    /// User-input target speed (expected 1-2)
     /// </summary>
     public float velocityInput;
     private float freGoal;
     private float lengthGoal;
     /// <summary>
-    /// 实际目标速度
+    /// Actual target speed
     /// </summary>
     private float velocityGoal;
 
@@ -87,31 +85,31 @@ public class Imitation : Agent
 
     private JointDriveController m_JdController;
     /// <summary>
-    /// 模拟中用到的关节，本实验中不包括上肢
+    /// Joints used in the simulation; upper limbs excluded for this experiment
     /// </summary>
     List<Transform> bodylistInUse;
 
     private ImuData2 imuData2;
     [HideInInspector] static public bool showtext;
-    public StatsRecorder statsRecorder;//tensorboard输出
+    public StatsRecorder statsRecorder;// tensorboard output
 
     /// <summary>
-    /// 相位参数，取值0-1
+    /// Phase parameter in [0,1]
     /// </summary>
     //[DisplayOnly]
     public float fai;
 
-    public int velocityRange; //计算平均速度时取多少个点，默认100
+    public int velocityRange; // number of samples to compute average speed (default 100)
     private List<float> positionlist;
     private List<Vector3> comPositionlist;
     float averVelocity;
 
     /// <summary>
-    /// 用于fai的计数，每一个循环结束都归零
+    /// Counter for fai; resets each cycle
     /// </summary>
     int i;
     /// <summary>
-    /// 用于reward中dataset计数，需要插值所以用float
+    /// Dataset index for reward interpolation
     /// </summary>
     float iDataset;
     int clipLengthDataset;
@@ -132,8 +130,8 @@ public class Imitation : Agent
     protected override void Awake()
     {
         base.Awake();
-        statsRecorder = Academy.Instance.StatsRecorder;//tensorboard输出
-        fileList = GetFiles("D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/JsonWithP/", ".json");
+        statsRecorder = Academy.Instance.StatsRecorder;// tensorboard output
+        fileList = GetFiles(Path.Combine(Application.streamingAssetsPath,"JsonWithP"), ".json");
 
         meshChangeObject = GameObject.FindGameObjectsWithTag("mesh");
         framerate = 30;
@@ -141,7 +139,7 @@ public class Imitation : Agent
 
         bodylistInUse = new List<Transform> { hips, thighL, shinL, footL, thighR, shinR, footR, spine };
 
-        //这四行测试用，固定序列且固定起点
+        // Test setup: fixed sequence and start point
         lengthInput = 1.5096f;
         velocityInput = 1.3828f;
         randomizeWalkLengthEachEpisode = false;
@@ -150,9 +148,9 @@ public class Imitation : Agent
 
     public override void Initialize()
     {
-        Time.fixedDeltaTime = 1.0f / framerate;//物理帧时长
+        Time.fixedDeltaTime = 1.0f / framerate;// physics step duration
 
-        //Setup each body part
+        // Setup each body part
         m_JdController = GetComponent<JointDriveController>();
         m_JdController.SetupBodyPart(hips);
         m_JdController.SetupBodyPart(chest);
@@ -171,7 +169,7 @@ public class Imitation : Agent
         m_JdController.SetupBodyPart(forearmR);
         m_JdController.SetupBodyPart(handR);
 
-        //ref中的关节，不确定加不加
+        // Reference joints (toggle if needed)
         m_JdController.SetupBodyPart(hipsRef);
         m_JdController.SetupBodyPart(spineRef);
         m_JdController.SetupBodyPart(thighLRef);
@@ -187,7 +185,7 @@ public class Imitation : Agent
         }
 
         fileStepLength = new Dictionary<float, string>();
-        LogStepLengthInJson(fileList);//记录每个文件的步长
+        LogStepLengthInJson(fileList);// log step length for each file
         //iniHipHeight = FootHeight(hips);
 
         showtext = true;
@@ -199,42 +197,42 @@ public class Imitation : Agent
     {
         i = 0;
         showtext = true;
-        //初始化角色位置
+        // Initialize agent pose
         foreach (var bodyPart in m_JdController.bodyPartsDict.Values) { bodyPart.Reset(bodyPart); };
 
-        //确定要模仿的文件
+        // Select reference clip to imitate
         lengthGoal =
-            randomizeWalkLengthEachEpisode ? Random.Range(1.12f, 1.68f) : lengthInput;//应该放一个已知的，1.5096f
+            randomizeWalkLengthEachEpisode ? Random.Range(1.12f, 1.68f) : lengthInput;// example fixed: 1.5096f
         velocityGoal =
-            randomizeWalkSpeedEachEpisode ? Random.Range(0.3f, 2.0f) : velocityInput;//1.3828f
+            randomizeWalkSpeedEachEpisode ? Random.Range(0.3f, 2.0f) : velocityInput;// example fixed: 1.3828f
         freGoal = velocityGoal / lengthGoal;
-        jsonDir = FindFileByStepLength(lengthGoal);//根据目标步长确定本轮所用的序列,返回字符串
+        jsonDir = FindFileByStepLength(lengthGoal);// select sequence by target step length
         //Debug.Log("jsonDir: " + jsonDir + " lengthGoal: " + lengthGoal + " velocityGoal: " + velocityGoal);
-        imuData2 = JsonConvert.DeserializeObject<ImuData2>(File.ReadAllText(@jsonDir));//得到本轮所用的参考目标
-        //***************如果要模仿给定的一个序列，就在这里盖过去
+        imuData2 = JsonConvert.DeserializeObject<ImuData2>(File.ReadAllText(@jsonDir));// reference for this episode
+        // Override here if imitating a specific fixed sequence
 
-        //随机数，取一帧作为初始姿态，计算帧数和起始点等参数
+        // Randomly choose a frame as initial pose; compute frame counts and starting indices
         clipLengthDataset = imuData2.walk.Length / 35;
         clipLengthImitation = Mathf.RoundToInt(framerate / freGoal);
         Debug.Log("clipLengthDataset: " + clipLengthDataset + " clipLengthImitation: " + clipLengthImitation+ " jsonDir: " + jsonDir);
 
 
-        i = Random.Range(0, clipLengthImitation-1);//在imitation中的位置
-        //i = 0;//测试用2
-        fai = (float)i / clipLengthImitation;//实际上训练用的fai
+        i = Random.Range(0, clipLengthImitation-1);// position within imitation clip
+        //i = 0;// test option
+        fai = (float)i / clipLengthImitation;// phase used for training
         iDataset = fai * (clipLengthDataset-1);
 
-        //记录速度相关，
+        // Initialize velocity tracking
         positionlist = new List<float>();
         comPositionlist = new List<Vector3>();
         averVelocity = 0;
         xPositionBeforeI = -new Vector3(keyFrameLinearLerp(imuData2.walk, 0, iDataset).x, 0, 0);
 
         //Debug.Log("i: " + i+ " fai: " + fai+ " iDataset: " + iDataset);
-        //摆出初始姿态
+        // Set initial pose
         SetIniPosture(iDataset);
 
-        //ref摆姿势
+        // Set reference pose
         MotionDataControlRef(imuData2, iDataset);
 
         RecordPostureFoot();
@@ -244,44 +242,43 @@ public class Imitation : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        if(positionlist.Count>1) showtext = false;//每次重来都显示
-        GroundTouchVisualize();//接触地面的变色
+        if(positionlist.Count>1) showtext = false;// only show on first few steps
+        GroundTouchVisualize();// change color on ground contact
 
-        //相位参数，1
+        // Phase parameter
         sensor.AddObservation(fai);
 
-        //目标步频，1
+        // Target cadence
         sensor.AddObservation(freGoal);
 
-        //hip离地高度, float，1
+        // Hip height above ground
         sensor.AddObservation(FootHeight(hips));
 
-        //速度误差，float，1
+        // Velocity error
         int init;
-        init = positionlist.Count > velocityRange ? positionlist.Count - velocityRange : 0;  //init为计时的初始位置
+        init = positionlist.Count > velocityRange ? positionlist.Count - velocityRange : 0;  // starting index for averaging
         averVelocity = positionlist.Count>1?Mathf.Abs(positionlist[positionlist.Count-1] - positionlist[init]) / (1.0f / framerate * (positionlist.Count- init-1)): m_JdController.bodyPartsDict[hips].rb.velocity.x;
         averComVelocity = positionlist.Count > 1 ? (comPositionlist[positionlist.Count - 1] - comPositionlist[init]) / (1.0f / framerate * (positionlist.Count - init - 1)) : m_JdController.bodyPartsDict[hips].rb.velocity;
         //sensor.AddObservation(velocityGoal - averVelocity);
         sensor.AddObservation(new Vector3(velocityGoal, 0, 0) - averComVelocity);
         sensor.AddObservation(velocityGoal - Vector3.Dot(averComVelocity, Vector3.right));
 
-        //目标速度，float,1
+        // Target speed
         sensor.AddObservation(velocityGoal);
 
-        //脚是否接触地面，bool，2
+        // Feet grounded
         sensor.AddObservation(m_JdController.bodyPartsDict[footL].groundContact.touchingGround);
         sensor.AddObservation(m_JdController.bodyPartsDict[footR].groundContact.touchingGround);
 
-        //加入各关节信息
+        // Joint information
 
-        //先加hips的,4+3+3=10
-        //全局旋转四元数，quaternion,4
+        // Hips: rotation + velocities
         sensor.AddObservation(hips.rotation);
-        //线速度，Vector3，3
+        // Linear velocity (world)
         sensor.AddObservation(m_JdController.bodyPartsDict[hips].rb.velocity);
-        //角速度，Vector3，3
+        // Angular velocity (world)
         sensor.AddObservation(m_JdController.bodyPartsDict[hips].rb.angularVelocity);
-        //****这里不确定加不加根节点的位置
+        // Root position intentionally omitted
 
 
         List<Transform> bodylistInUse2 = new List<Transform> { hips, thighL, shinL, footL, thighR, shinR, footR, spine, chest, head };
@@ -289,27 +286,26 @@ public class Imitation : Agent
         {
             Unity.MLAgentsExamples.BodyPart bp = m_JdController.bodyPartsDict[trans];
 
-            //一共7个关节，每个有4+3+3+1=11,11*7=77;三个肢体末端位置，3*3=9
             if (trans != hips)
             {
-                //localrotation，quaternion, 4
+                // Local rotation
                 sensor.AddObservation(trans.localRotation);
-                //线速度,Vector3，3//******这里不确定用自带的刚体还是自己算的！
+                // Linear velocity (world)
                 sensor.AddObservation(bp.rb.velocity);
                 //sensor.AddObservation(bp.velocity);
-                //角速度,Vector3，3
+                // Angular velocity (world)
                 sensor.AddObservation(bp.rb.angularVelocity);
                 //sensor.AddObservation(bp.angularVelocity);
-                //扭矩上限,float, 1
+                // Torque limit ratio
                 sensor.AddObservation(bp.currentStrength / m_JdController.maxJointForceLimit);
             }
-            if (trans == footL || trans == footR || trans == spine)//肢体末端相对根节点位置
+            if (trans == footL || trans == footR || trans == spine)// end-effector positions relative to hips
                 sensor.AddObservation(trans.position - hips.position);
         }
     }
 
     /// <summary>
-    /// action函数，这个对各个脚本都一致
+    /// Apply actions to joints
     /// </summary>
     /// <param name="actions"></param>
     public override void OnActionReceived(ActionBuffers actions)
@@ -339,21 +335,21 @@ public class Imitation : Agent
         bpDict[chest].SetJointStrength(continuousActions[++n]);
         bpDict[head].SetJointStrength(continuousActions[++n]);
 
-        positionlist.Add(hips.position.x);//待改positionlist.Add(hipsRef.position.x);
+        positionlist.Add(hips.position.x);
         comPositionlist.Add(comCalculate());
 
-        if (Math.Abs(hips.position.x - Target.position.x) < 1)//快到目标就停止
+        if (Math.Abs(hips.position.x - Target.position.x) < 1)
         {
             SetReward(1);
-            Debug.Log("到达目标");
+            Debug.Log("Reached target");
             EndEpisode();
         }
 
         TotalRewardCalculate(imuData2, iDataset);
         RecordPostureFoot();
 
-        i++;//这个要在算完reward之后更新
-        if (i == clipLengthImitation) i = 0; //重回fai=0的位置
+        i++;
+        if (i == clipLengthImitation) i = 0; // wrap back to fai=0
         fai = (float)i / clipLengthImitation;
         iDataset = fai * clipLengthDataset;
 
@@ -365,9 +361,8 @@ public class Imitation : Agent
     {
 
     }
-    private void MotionDataControlRef(ImuData2 imuData2, float iDataset)//一共35维
+    private void MotionDataControlRef(ImuData2 imuData2, float iDataset)// 35 dimensions total
     {
-        //先借用这个做一下中间变量
         if (positionlist.Count == 0)
             m_JdController.bodyPartsDict[hipsRef].PrePosition = xPositionBeforeI;
         else if (i == 0)
@@ -385,7 +380,6 @@ public class Imitation : Agent
             Quaternion bodyAngle = keyFrameQLerp(imuData2.walk, 3 + count * 4, iDataset);
             if (trans == hipsRef) trans.rotation = bodyAngle;
             else trans.localRotation = bodyAngle;
-            //这里不能指定刚体速度，会被用物理计算，差很多
             count++;
         }
 
@@ -397,62 +391,52 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 用于加奖励,给定需要的数据set
+    /// Compute reward using the reference dataset
     /// </summary>
     public void TotalRewardCalculate(ImuData2 imuData2, float iDataset)
     {
-        // 1: 任务完成水平（包括走地形、方向、速度）-------------------------------------------------------------------------
-        // 1.1 hip高度与地形高度一致，保留,额外增加左右
-        var delatHeight = (Mathf.Abs(FootHeight(hips) - FootHeight(hipsRef)));//hip距离地面高度应该是0.7-0.9之间
+        // 1: Task completion (terrain, direction, speed)
+        // 1.1 Hip height matches reference
+        var delatHeight = (Mathf.Abs(FootHeight(hips) - FootHeight(hipsRef)));// hip-to-ground height should be ~0.7-0.9
         var delatLateral = (hips.position.z-m_JdController.bodyPartsDict[hips].startingPos.z)-(hipsRef.position.z - m_JdController.bodyPartsDict[hipsRef].startingPos.z);
         float hipHeightReward = (float)Math.Exp(-40 * delatHeight * delatHeight) * (float)Math.Exp(-200 * delatLateral * delatLateral);
-        //Debug.Log("FootHeight(hips): " + FootHeight(hips) + " FootHeight(hipsRef): " + FootHeight(hipsRef) + " delatLateral: " + delatLateral + " hipHeightReward: " + hipHeightReward);//已验证
 
-        // 1.2 行走的总方向要朝正方向，hip末位置减初位置，三轴，暂时省略
+        // 1.2 Walk generally forward (+x)
         Vector3 direction = new Vector3(hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x, 0, hips.position.z - m_JdController.bodyPartsDict[hips].startingPos.z).normalized;
         float deltadirection = 1 - Mathf.Clamp( Vector3.Dot(direction.normalized, Vector3.right),0,1);
         float forwardReward = (float)Math.Exp(-deltadirection * deltadirection);
-        //Debug.Log("direction: " + direction.normalized + " deltadirection: " + Vector3.Dot(direction.normalized, Vector3.right) + " forwardReward: "+ forwardReward);//已验证
 
-        // 1.3 速度一致，保留
+        // 1.3 Match target speed
         float deltaV = velocityGoal - Vector3.Dot(averComVelocity, Vector3.right);
         float velocityReward = Mathf.Exp(-2.5f * deltaV * deltaV);
-        //Debug.Log(" velocityGoal: " + velocityGoal + " averVelocity: " + averVelocity + " velocityReward: " + velocityReward);//已验证
 
-        // 1.4 长度一致,暂时省略
+
+        // 1.4 Match step length
         float deltaLength = ((hipsRef.position.x - m_JdController.bodyPartsDict[hipsRef].startingPos.x) - (hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x))/ (hipsRef.position.x - m_JdController.bodyPartsDict[hipsRef].startingPos.x+0.01f);
         float LengthReward = (float)Math.Exp(-deltaLength * deltaLength);
-        //Debug.Log(" data length: " + (hipsRef.position.x - m_JdController.bodyPartsDict[hipsRef].startingPos.x) + " imitation length: " + (hips.position.x - m_JdController.bodyPartsDict[hips].startingPos.x) + " deltaLength: " + deltaLength + " LengthReward: " + LengthReward);//已验证
-        //Debug.DrawLine(hipsRef.position, m_JdController.bodyPartsDict[hipsRef].startingPos, Color.grey, 2);
-        //Debug.DrawLine(hips.position, m_JdController.bodyPartsDict[hips].startingPos, Color.grey, 2);
 
-        //float goalReward = hipHeightReward * velocityReward * forwardReward * LengthReward*10;
         float goalReward = velocityReward * forwardReward * 0.5f + hipHeightReward * 0.5f;
-        //Debug.Log("velocityGoal: " + velocityGoal + " comvelocity: "+ averComVelocity +" com Forward Velocity"+ Vector3.Dot(averComVelocity, Vector3.right) + " deltaV2: " + deltaV2);
 
-        // 2: 行走水平（双脚触地、脚步不拖行、走得远）------------------------------------------------------------------------
-        // 2.1 脚着地
+        // 2: Gait quality (grounding, drag, distance)
+        // 2.1 Both feet on ground is discouraged
         float bodyStableReward = 0;
         if (m_JdController.bodyPartsDict[footL].groundContact.touchingGround && !m_JdController.bodyPartsDict[footR].groundContact.touchingGround)
         { bodyStableReward = -0.005f; }
-        // 2.2 不拖地
-        float footDragPenal = FootDrag();//不着地时为零，拖动时为负值
-        // 2.3 走得远
+        // 2.2 No dragging
+        float footDragPenal = FootDrag();// zero when airborne, negative when dragging
+        // 2.3 Encourage progress
         float walklengthReward = 0.005f;
 
         float walkAbilityReward = bodyStableReward + footDragPenal + walklengthReward;
-        //Debug.Log("bodyStableReward(未触地): " + bodyStableReward + " footDragPenal: " + footDragPenal + " walklengthReward: " + walklengthReward);
 
+        // 3: Imitation similarity
+        // Target frame index: iDataset
 
-        // 3：模仿相似度------------------------------------------------------------------------
-        // 目标的帧数为：iDataset
-
-        // 3.1 重心位置、肢体末端相对hip的位置
-        //重心位置
-        float delta1 = Vector3.Magnitude(comCalculate() - hips.position - keyFrameLinearLerp(imuData2.comPosition, 0, iDataset));//正常值0.07-0.1估计
-        float delta2 = Vector3.Magnitude(footL.position - hips.position - keyFrameLinearLerp(imuData2.endPosition, 0, iDataset));//正常值0.07
+        // 3.1 COM and end-effector positions relative to hips
+        float delta1 = Vector3.Magnitude(comCalculate() - hips.position - keyFrameLinearLerp(imuData2.comPosition, 0, iDataset));// expected ~0.07-0.1
+        float delta2 = Vector3.Magnitude(footL.position - hips.position - keyFrameLinearLerp(imuData2.endPosition, 0, iDataset));// expected ~0.07
         float delta3 = Vector3.Magnitude(footR.position - hips.position - keyFrameLinearLerp(imuData2.endPosition, 3, iDataset));
-        float delta4 = Vector3.Magnitude(spine.position - hips.position - keyFrameLinearLerp(imuData2.endPosition, 6, iDataset));//正常值0.01
+        float delta4 = Vector3.Magnitude(spine.position - hips.position - keyFrameLinearLerp(imuData2.endPosition, 6, iDataset));// expected ~0.01
 
         //Debug.Log("delta1: "+ Math.Exp(-delta1 * delta1) + " delta2: " + Math.Exp(-delta2 * delta2) + " delta3: " + Math.Exp(-delta3 * delta3) + " delta4: " + Math.Exp(-delta4 * delta4));
         float keypositionReward = (float)Math.Exp(-40 * (delta2 * delta2 + delta3 * delta3 + delta4 * delta4));
@@ -461,7 +445,7 @@ public class Imitation : Agent
         //Debug.Log("keypositionReward: " + keypositionReward);
 
 
-        // 3.2 各关节的旋转角、角速度、速度
+        // 3.2 Joint angles, angular velocity, and linear velocity
         // bodylistInUse = new List<Transform> { hips, thighL, shinL, footL, thighR, shinR, footR, spine };
         List<Transform> bodylistInUse4 = new List<Transform> { hipsRef, thighLRef, shinLRef, footLRef, thighRRef, shinRRef, footRRef, spineRef };
         float keyAngleReward = 0;
@@ -472,58 +456,35 @@ public class Imitation : Agent
         {
             Unity.MLAgentsExamples.BodyPart bp = m_JdController.bodyPartsDict[trans];
 
-            //关节速度,都是相对于世界坐标系，3维
+            // Joint linear velocity in world frame
             float deltaKeyV = Vector3.Magnitude(bp.rb.velocity - keyFrameLinearLerp(imuData2.bodyPartVelocity, count*3, iDataset));
             keyVelocityReward += deltaKeyV * deltaKeyV;
 
-            //关节角速度,都是相对于世界坐标系，3维
+            // Joint angular velocity in world frame
             float deltaKeyAngleV = Vector3.Magnitude(bp.rb.angularVelocity - keyFrameLinearLerp(imuData2.angularVelocity, count * 3, iDataset));
             keyAngleVelociyReward += deltaKeyAngleV * deltaKeyAngleV;
 
-            //关节角度，4维
+            // Joint angle (quaternion)
             Quaternion bodyAngle = trans == hipsRef ? trans.rotation : trans.localRotation;
             Quaternion datasetAngle = keyFrameQLerp(imuData2.walk, 3 + count * 4, iDataset);
             float deltaKeyAngle = Quaternion.Angle(bodyAngle, datasetAngle) *Mathf.Deg2Rad;
             keyAngleReward += deltaKeyAngle * deltaKeyAngle;
 
-            //if (trans == hipsRef) Debug.Log("reward中 hipsRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == thighLRef) Debug.Log("thighLRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == shinLRef) Debug.Log("shinLRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == footLRef) Debug.Log("footLRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == thighRRef) Debug.Log("thighRRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == shinRRef) Debug.Log("shinRRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == footRRef) Debug.Log("footRRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-            //if (trans == spineRef) Debug.Log("spineRef bodyAngle: " + bodyAngle.eulerAngles + " datasetAngle: " + datasetAngle.eulerAngles + "  deltaKeyAngle: " + Quaternion.Angle(bodyAngle, datasetAngle));
-
-            //List<Transform> bodylistInUseRef = new List<Transform> { hipsRef, thighLRef, shinLRef, footLRef, thighRRef, shinRRef, footRRef, spineRef };
-            //int count = 0;
-            //foreach (var trans in bodylistInUseRef)//q order: x y z w
-            //{
-            //    Quaternion bodyAngle = keyFrameQLerp(imuData2.walk, 3 + count * 4, iDataset);
-            //    if (trans == hipsRef) trans.rotation = bodyAngle;
-            //    else trans.localRotation = bodyAngle;
-            //    count++;
-            //}
-
             count++;
         }
-        //让上半身直立的
+
         float deltaKeyAngle1 = Quaternion.Angle(chest.rotation, m_JdController.bodyPartsDict[chest].startingRot) * Mathf.Deg2Rad;
         keyAngleReward += deltaKeyAngle1 * deltaKeyAngle1;
         float deltaKeyAngle2 = Quaternion.Angle(head.rotation, m_JdController.bodyPartsDict[head].startingRot) * Mathf.Deg2Rad;
         keyAngleReward += deltaKeyAngle2 * deltaKeyAngle2;
 
-        keyVelocityReward = (float)Math.Exp(-keyVelocityReward);//先省略
+        keyVelocityReward = (float)Math.Exp(-keyVelocityReward);// simplified term
         keyAngleVelociyReward = (float)Math.Exp(-0.1 * keyAngleVelociyReward);
         keyAngleReward = (float)Math.Exp(-2 * keyAngleReward);
 
-        //Debug.Log("keyAngleReward: " + keyAngleReward + " keyAngleVelociyReward: " + keyAngleVelociyReward + "  keyVelocityReward: " + keyVelocityReward);
-
         float keyFrameReward = 0.65f * keyAngleReward + 0.1f * keyAngleVelociyReward + 0.15f * keypositionReward + 0.1f * compositionReward;
-
         float totalReward = 0.2f * goalReward + 0.8f * keyFrameReward + walkAbilityReward;
-        //totalReward = keyAngleReward*0.2f + walklengthReward + hipHeightReward*0.5f + LengthReward*0.3f;//调试用3
-        //Debug.Log("totalReward: "+ totalReward);
+
 
         AddReward(totalReward);
 
@@ -546,7 +507,7 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 对三维向量内容做线性插值
+    /// Linear interpolation over a 3D vector sequence
     /// </summary>
     /// <param name="comPosition"></param>
     /// <param name="begin"></param>
@@ -562,7 +523,7 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 对关节旋转做四元数差值
+    /// Quaternion interpolation between keyframes
     /// </summary>
     /// <param name=""></param>
     /// <param name=""></param>
@@ -582,7 +543,7 @@ public class Imitation : Agent
 
 
     /// <summary>
-    /// 范围0-1，不拖地时为1
+    /// Range 0-1; 1 when no dragging
     /// </summary>
     /// <returns></returns>
     private float FootDrag()
@@ -609,33 +570,33 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 计算脚离地高度
+    /// Compute foot height above ground
     /// </summary>
     /// <param name="foot"></param>
     /// <returns></returns>
     public float FootHeight(Transform foot)
     {
-        RaycastHit[] hit;//检测射线碰撞
+        RaycastHit[] hit;// raycast hits
 
         List<float> rayDistancelist = new List<float>(); ;
 
-        hit = Physics.RaycastAll(foot.position, Vector3.down, 500f, ~(1 << 0));//有碰撞物体
+        hit = Physics.RaycastAll(foot.position, Vector3.down, 500f, ~(1 << 0));// check collisions
 
         if (hit.Length == 0) { return 0; }
         else
         {
             for (int c = 0; c < hit.Length; c++)
             {
-                if (hit[c].collider.gameObject.CompareTag("ground"))//碰撞物体为地面
+                if (hit[c].collider.gameObject.CompareTag("ground"))// collider is ground
                 { rayDistancelist.Add(hit[c].distance); }
             }
 
-            return rayDistancelist.Min();//返回最近的地面
+            return rayDistancelist.Min();// return nearest ground distance
         }
     }
 
     /// <summary>
-    /// 由四元数变化计算角速度，输出速度单位为rad/s
+    /// Compute angular velocity from quaternion change (rad/s)
     /// </summary>
     /// <param name="lastRoation"></param>
     /// <param name="thisRotation"></param>
@@ -656,7 +617,7 @@ public class Imitation : Agent
 
 
     /// <summary>
-    /// 记录全身姿态，包括当前rotation和postion（世界坐标系）
+    /// Record posture for feet, including contact and positions
     /// </summary>
     public void RecordPostureFoot()
     {
@@ -672,16 +633,16 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 对所有tag是mesh的物体，进行触地检测，触地时变色
+    /// For all objects tagged "mesh", detect ground contact and change color
     /// </summary>
     public void GroundTouchVisualize()
     {
 
         foreach (var meshObject in meshChangeObject)
         {
-            //查找父级物体
+            // Find parent transform
             Transform parentTransform = meshObject.transform.parent;
-            //如果父级物体有关节属性
+            // Only handle meshes whose parent is a controlled body part
             if (m_JdController.bodyPartsDict.Keys.Contains(parentTransform))
             {
                 meshObject.GetComponent<Renderer>().material = m_JdController.bodyPartsDict[parentTransform].groundContact.touchingGround
@@ -695,25 +656,25 @@ public class Imitation : Agent
     public class ImuData2
     {
         /// <summary>
-        /// 身体位置和姿态，只包括需要用到的几个体段
+        /// Body pose for required segments
         /// </summary>
         public float[,] walk;
         /// <summary>
-        /// 肢体末端位置，0-2 footL，3-5 footR，6-8 spine
+        /// End-effector positions: 0-2 footL, 3-5 footR, 6-8 spine
         /// </summary>
         public float[,] endPosition;
         /// <summary>
-        /// 足部和地面是否接触，0 footL，1 footR；接触为1，不接触为0
+        /// Foot-ground contact: 0 footL, 1 footR; 1=contact, 0=air
         /// </summary>
         public int[,] footContact;
         public float[,] comPosition;
         /// <summary>
-        /// 角速度，只包括需要用到的几个体段
+        /// Angular velocity for the required segments
         /// </summary>
         public float[,] angularVelocity;
         public float[,] bodyPartVelocity;
         /// <summary>
-        /// 这段时间的步速
+        /// Step speed during the clip
         /// </summary>
         public float aveVelocity;
         public float stepLength;
@@ -722,7 +683,7 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 填写字典fileStepLength = new Dictionary<float, string>()
+    /// Populate fileStepLength dictionary
     /// </summary>
     public void LogStepLengthInJson(List<string> fileList)
     {
@@ -738,7 +699,7 @@ public class Imitation : Agent
     }
 
     /// <summary>
-    /// 根据目标步长确定本轮所用的序列,返回字符串
+    /// Choose the sequence closest to target step length
     /// </summary>
     /// <param name="length"></param>
     /// <returns></returns>
@@ -755,16 +716,16 @@ public class Imitation : Agent
             y++;
             //Debug.Log("key"+ key+ " key - length" + Math.Abs(key - steplength));
         }
-        var (minValue, minIndex) = lengthList_abs.Select((x, i) => (x, i)).Min();//找到步长相差最小的那一帧
+        var (minValue, minIndex) = lengthList_abs.Select((x, i) => (x, i)).Min();// frame with closest step length
 
-        //Debug.Log("查找和给定步长最近的文件 minValue " + minValue + " minIndex " + minIndex + " lengthList_origin[minIndex] "+ lengthList_origin[minIndex]);
+        //Debug.Log("Closest file to target step length minValue " + minValue + " minIndex " + minIndex + " lengthList_origin[minIndex] "+ lengthList_origin[minIndex]);
         jsonDir = fileStepLength[lengthList_origin[minIndex]];
-        //Debug.Log("查找和给定步长最近的文件 minValue " + minValue + " minIndex" + minIndex + " jsonDir " + jsonDir);
+        //Debug.Log("Closest file to target step length minValue " + minValue + " minIndex" + minIndex + " jsonDir " + jsonDir);
         return jsonDir;
     }
 
-        /// <summary>
-    /// 每一帧开头，姿态的随机初始化
+    /// <summary>
+    /// Randomize initial pose at frame start
     /// </summary>
     public void SetIniPosture(float keyini)
     {
@@ -777,21 +738,21 @@ public class Imitation : Agent
         //int counta = 0;
         foreach (var trans in bodylistInUse)//q order: x y z w
         {
-            //姿态指定
+            // Apply pose from reference
             Quaternion bodyAngle = keyFrameQLerp(motionData, 3 + count * 4, keyini);
             if (trans == hips) trans.rotation = bodyAngle;
             else trans.localRotation = bodyAngle;
             count++;
-            //刚体速度指定
+            // Rigidbody velocities (unused)
             //m_JdController.bodyPartsDict[trans].rb.velocity = keyFrameLinearLerp(imuData2.bodyPartVelocity, countv*3, keyini);
             //m_JdController.bodyPartsDict[trans].rb.angularVelocity = keyFrameLinearLerp(imuData2.angularVelocity, counta*3, keyini);
             //countv++; counta++;
         }
     }
     /// <summary>
-    /// 求重心位置com
+    /// Compute center of mass
     /// </summary>
-    /// <returns>全局坐标系下重心位置</returns>
+    /// <returns>Center of mass in world space</returns>
     private Vector3 comCalculate()
     {
         Vector3 com = Vector3.zero; float mass = 0;
@@ -802,27 +763,9 @@ public class Imitation : Agent
             com += m_JdController.bodyPartsDict[trans].rb.mass * trans.position;
             mass += m_JdController.bodyPartsDict[trans].rb.mass;
         }
-        com /= mass;//重心位置
+        com /= mass;
         return com;
     }
 }
 
-//public class DisplayOnly : PropertyAttribute
-//{
-
-//}
-//[CustomPropertyDrawer(typeof(DisplayOnly))]
-//public class ReadOnlyDrawer : PropertyDrawer
-//{
-//    public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-//    {
-//        return EditorGUI.GetPropertyHeight(property, label, true);
-//    }
-//    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-//    {
-//        GUI.enabled = false;
-//        EditorGUI.PropertyField(position, property, label, true);
-//        GUI.enabled = true;
-//    }
-//}
 

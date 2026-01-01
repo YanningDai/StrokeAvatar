@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel;
 
 public class CubeV : MonoBehaviour
 {
@@ -31,9 +32,9 @@ public class CubeV : MonoBehaviour
         Time.fixedDeltaTime = 1.0f / 120;
         i = 0;
         fileNum = 0;
-        //Dir = Application.streamingAssetsPath + "/JsonWithP/walk14.json"; //调试
+        string dir = Path.Combine(Application.streamingAssetsPath,"JsonWithP");
         
-        fileList = getFiles("D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/JsonWithP/", ".json");
+        fileList = getFiles(dir, ".json");
         rb = gameObject.GetComponent<Rigidbody>();
         startPosition = gameObject.transform.position;
         startRotation = gameObject.transform.rotation;
@@ -47,7 +48,7 @@ public class CubeV : MonoBehaviour
         if (i == 0 && midStartPosition == Vector3.zero)
         {
             Debug.Log("fileNum" + fileNum);
-            if (fileNum == fileList.Count()) { fileNum = 0; }//所有序列都处理完，就从头来
+            if (fileNum == fileList.Count()) { fileNum = 0; }
             Dir = fileList[fileNum];
             imuData2 = JsonConvert.DeserializeObject<ImuData2>(File.ReadAllText(@Dir));
 
@@ -68,16 +69,15 @@ public class CubeV : MonoBehaviour
             rbVelocity.datasetAngleVelocity[i - 1, 0] = angleVelocityDataset.x; rbVelocity.datasetAngleVelocity[i - 1, 1] = angleVelocityDataset.y; rbVelocity.datasetAngleVelocity[i - 1, 2] = angleVelocityDataset.z;
         }
 
-        // 1 测试速度
+        // 1 test linear velocity
 
-        // 移动到位置
         positionDataset = new Vector3(imuData2.walk[i, 0], imuData2.walk[i, 1], imuData2.walk[i, 2]);
         velocityDataset = new Vector3(imuData2.bodyPartVelocity[i, 0], imuData2.bodyPartVelocity[i, 1], imuData2.bodyPartVelocity[i, 2]);
         rb.MovePosition(startPosition + positionDataset+ midStartPosition);
         //Debug.Log("rb.velocity " + rb.velocity+ " dataset velcocity: "+ velocityDataset);
 
 
-        // 2 测试角速度
+        // 2 test angular velocity
         rotationDataset = new Quaternion(imuData2.walk[i, 7], imuData2.walk[i, 8], imuData2.walk[i, 9], imuData2.walk[i, 10]);
         angleVelocityDataset = new Vector3(imuData2.angularVelocity[i, 3], imuData2.angularVelocity[i, 4], imuData2.angularVelocity[i, 5]);
         rb.MoveRotation(startRotation* rotationDataset);
@@ -86,14 +86,14 @@ public class CubeV : MonoBehaviour
         if (i == length - 1)
         {
             i = -1;
-            if (Mathf.Abs(gameObject.transform.position.x - startPosition.x) < 10)//目标是十米
+            if (Mathf.Abs(gameObject.transform.position.x - startPosition.x) < 10)// target distance is ten meters
             {
                 midStartPosition = new Vector3(gameObject.transform.position.x - startPosition.x, 0, 0);
             }
             else
             {
                 midStartPosition = Vector3.zero;
-                Dir2 = "D:/UNITY/ml-agent/mlagent/Project/Assets/StreamingAssets/Rigidbody/" + Dir.Remove(0, 67);
+                Dir2 = Path.Combine(Application.streamingAssetsPath,"Rigidbody") + Dir.Remove(0, 67);
                 File.WriteAllText(Dir2, JsonConvert.SerializeObject(rbVelocity), new System.Text.UTF8Encoding(false));
                 fileNum++;
             }
@@ -103,10 +103,10 @@ public class CubeV : MonoBehaviour
     }
 
     /// <summary>
-    /// 由四元数变化计算角速度，输出速度单位为rad/s
+    /// Compute angular velocity from quaternion delta in rad/s
     /// </summary>
-    /// <param name="preRoation">上一帧</param>
-    /// <param name="thisRotation">当前的</param>
+    /// <param name="preRoation">previous frame</param>
+    /// <param name="thisRotation">current frame</param>
     /// <returns></returns>
     public Vector3 AngularVelocityCalculate(Quaternion preRoation, Quaternion thisRotation)
     {
@@ -127,25 +127,25 @@ public class CubeV : MonoBehaviour
     public class ImuData2
     {
         /// <summary>
-        /// 身体位置和姿态，只包括需要用到的几个体段
+        /// Body position and orientation for the used body segments
         /// </summary>
         public float[,] walk;
         /// <summary>
-        /// 肢体末端位置，0-2 footL，3-5 footR，6-8 spine
+        /// End-effector positions; 0-2 footL, 3-5 footR, 6-8 spine
         /// </summary>
         public float[,] endPosition;
         /// <summary>
-        /// 足部和地面是否接触，0 footL，1 footR；接触为1，不接触为0
+        /// Foot-ground contact; 0 footL, 1 footR; 1 means contact
         /// </summary>
         public int[,] footContact;
         public float[,] comPosition;
         /// <summary>
-        /// 角速度，只包括需要用到的几个体段
+        /// Angular velocities for the used body segments
         /// </summary>
         public float[,] angularVelocity;
         public float[,] bodyPartVelocity;
         /// <summary>
-        /// 这段时间的步速
+        /// Walking speed over this clip
         /// </summary>
         public float aveVelocity;
         public float stepLength;
@@ -169,7 +169,7 @@ public class CubeV : MonoBehaviour
         foreach (FileInfo f in file)
         {
             filename = f.FullName;
-            if (filename.EndsWith(suffix))//判断文件后缀，并获取指定格式的文件全路径增添至fileList
+            if (filename.EndsWith(suffix))// filter by suffix and add full paths
             {
                 fileList.Add(filename);
             }
