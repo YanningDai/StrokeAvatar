@@ -35,7 +35,7 @@ namespace Unity.MLAgentsExamples
 
                 if (agentDoneOnGroundContact)
                 {
-                    //Debug.Log("摔倒 OnCollisionEnter");
+                    //Debug.Log("触地 OnCollisionEnter");
                     agent.EndEpisode();
                 }
             }

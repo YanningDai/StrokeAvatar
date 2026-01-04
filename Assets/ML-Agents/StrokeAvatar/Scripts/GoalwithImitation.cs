@@ -82,7 +82,8 @@ public class GoalwithImitation : Agent
     public Transform shinL;
     public Transform thighR;
     public Transform shinR;
-
+    public Transform footLMesh;
+    public Transform footRMesh;
     private JointDriveController m_JdController;
     /// <summary>
     /// Joints used in the simulation (upper limbs excluded)
@@ -160,6 +161,8 @@ public class GoalwithImitation : Agent
 
     public override void OnEpisodeBegin()
     {
+        ApplyTerrainCurriculum();
+        
         i = 0;
         showtext = true;
         // Initialize agent pose
@@ -201,6 +204,24 @@ public class GoalwithImitation : Agent
         MotionDataControlRef(imuData2, iDataset);
 
         RecordPostureFoot();
+    }
+
+    void ApplyTerrainCurriculum()
+    {
+        float terrainValue = Academy.Instance.EnvironmentParameters.GetWithDefault( "my_environment_parameter", 0f );
+        StairsController stairs = FindObjectOfType<StairsController>();
+        if (stairs != null && stairs.gameObject.activeInHierarchy)
+        {
+            stairs.ApplyCurriculum(terrainValue);
+            return;
+        }
+
+        SlopeController slope = FindObjectOfType<SlopeController>();
+        if (slope != null && slope.gameObject.activeInHierarchy)
+        {
+            slope.ApplyCurriculum(terrainValue);
+            Debug.Log("Applied slope curriculum with height (cm): " + terrainValue);
+        }
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -485,8 +506,74 @@ public class GoalwithImitation : Agent
         statsRecorder.Add("3.2 key Angle Reward", keyAngleReward, StatAggregationMethod.Average);
         statsRecorder.Add("3.3 key Angle Velocity Reward", keyAngleVelociyReward, StatAggregationMethod.Average);
         statsRecorder.Add("3.4 key Velocity Reward", keyVelocityReward, StatAggregationMethod.Average);
+    
+        AddReward(0.5f * ComputeStairLegRaiseReward());
     }
 
+    float ComputeStairLegRaiseReward()
+    {
+        GameObject stepObj = GameObject.Find("Step1");
+        if (stepObj == null || !stepObj.activeInHierarchy)
+            return 0f;
+
+        Collider stepCol = stepObj.GetComponent<Collider>();
+        if (stepCol == null)
+            return 0f;
+
+        Transform[] feet = { shinL, shinR };
+
+        bool stepDetected = false;
+        float minDx = float.MaxValue;
+
+        float stepX = stepCol.bounds.min.x;  
+
+        foreach (var foot in feet)
+        {
+            float footX = GetFootTipX(foot);
+            float dx = stepX - footX;
+            // UnityEngine.Debug.Log($"Foot {foot.name} dx to step: {dx}");
+            if (dx >= 0 && dx < minDx) minDx = dx;
+        }
+
+        if (minDx <= 0.05f) stepDetected = true;
+
+        if (!stepDetected) return 1f;
+
+        float footClearance = Mathf.Max(
+            FootHeight(footLMesh),
+            FootHeight(footRMesh)
+        );
+
+        float stepHeight = stepCol.transform.localPosition.y;
+        float desiredClearance = stepHeight + 0.02f;
+        float ratio = Mathf.Clamp01(footClearance / desiredClearance);
+
+        float stairReward = ratio >= 1f ? 1f : ratio * ratio;
+
+        // UnityEngine.Debug.Log("Stair leg raise reward: " + stairReward);
+        // UnityEngine.Debug.Log("Step height: " + stepHeight);
+        // UnityEngine.Debug.Log("Foot pos: " + footClearance);
+
+        return stairReward;
+    }
+
+    float GetFootTipX(Transform foot)
+    {
+        CapsuleCollider[] caps = foot.GetComponentsInChildren<CapsuleCollider>();
+        if (caps == null || caps.Length == 0)
+            return foot.position.x;
+
+        foreach (var cap in caps)
+        {
+            if (cap.direction == 0) // x-axis capsule
+            {
+                Vector3 localTip = cap.center + Vector3.right * cap.radius;
+                return cap.transform.TransformPoint(localTip).x;
+            }
+        }
+
+        return foot.position.x;
+    }
 
     /// <summary>
     /// Optimize using joint angles in world space

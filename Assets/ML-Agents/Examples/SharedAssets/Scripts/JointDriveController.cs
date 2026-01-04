@@ -61,7 +61,6 @@ namespace Unity.MLAgentsExamples
         {
             bp.rb.transform.position = bp.startingPos;
             bp.rb.transform.rotation = bp.startingRot;
-            bp.PrePosition = Vector3.zero;
             bp.rb.velocity = Vector3.zero;
             bp.rb.angularVelocity = Vector3.zero;
             if (bp.groundContact)
@@ -118,7 +117,7 @@ namespace Unity.MLAgentsExamples
         public float maxJointSpring;
 
         public float jointDampen;
-        public float maxJointForceLimit;//ui界面中自己输入的最大驱动力（slerp drive的，不是关节断裂极限）
+        public float maxJointForceLimit;
         float m_FacingDot;
 
         [HideInInspector] public Dictionary<Transform, BodyPart> bodyPartsDict = new Dictionary<Transform, BodyPart>();

@@ -55,7 +55,7 @@ behaviors:
 #           min_lesson_length: 500
 #           threshold: 300
 #           require_reset: true
-#         value: 0.25
+#         value: 3.75
 #       - name: Lesson3
 #         completion_criteria:
 #           measure: reward
@@ -64,7 +64,7 @@ behaviors:
 #           min_lesson_length: 500
 #           threshold: 300
 #           require_reset: true
-#         value: 0.5
+#         value: 7.5
 #       - name: Lesson4
 #         completion_criteria:
 #           measure: reward
@@ -73,8 +73,8 @@ behaviors:
 #           min_lesson_length: 500
 #           threshold: 300
 #           require_reset: true
-#         value: 0.75
+#         value: 11.25
 #       - name: Lesson5
-#         value: 1.0
+#         value: 15.0
 
 

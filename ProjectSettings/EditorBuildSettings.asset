@@ -6,13 +6,13 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 0
-    path: Assets/ML-Agents/StrokeAvatar/Scenes/FinalExperiment.unity
+    path: Assets/ML-Agents/Examples/MotionCapture/Scenes/FinalExperiment.unity
     guid: 09725f7e295bf13498b33056cc5847dc
   - enabled: 0
-    path: Assets/ML-Agents/StrokeAvatar/Scenes/MotionCapture 1.unity
+    path: Assets/ML-Agents/Examples/MotionCapture/Scenes/MotionCapture 1.unity
     guid: 062f7840073e93e4b8ea3d028fb360e8
-  - enabled: 1
-    path: Assets/ML-Agents/1 MotionCapture/1 Scenes/1 Database.unity
+  - enabled: 0
+    path: Assets/ML-Agents/Examples/MotionCapture/Scenes/walker1.unity
     guid: e1755b9c062e0894fa1c98e7e8208e5e
   - enabled: 0
     path: Assets/ML-Agents/StrokeAvatar/Scenes/Conctroller.unity
