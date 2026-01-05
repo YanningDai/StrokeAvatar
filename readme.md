@@ -81,7 +81,7 @@ python -m pip install ./ml-agents --no-deps
 
 Two training modes are supported:
 
-### 1. Interactive Unity Environment
+### 1. Interactive Mode
 
 Used primarily for debugging and visualization within the Unity Editor.
 
@@ -93,7 +93,7 @@ mlagents-learn <config_file> --run-id <run_name>
 mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml --run-id healthatlas_1
 ```
 
-### 2. Standalone Built Environment
+### 2. Standalone Mode
 
 Recommended for large-scale training. First, build the Unity environment for your target operating system (macOS, Linux, or Windows), then train using the exported executable.:
 
