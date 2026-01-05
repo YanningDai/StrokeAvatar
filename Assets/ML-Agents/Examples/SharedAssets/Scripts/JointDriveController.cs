@@ -16,15 +16,14 @@ namespace Unity.MLAgentsExamples
         [HideInInspector] public Vector3 startingPos;
         [HideInInspector] public Quaternion startingRot;
 
-        //这四个是自己加的，用来计算速度
         [HideInInspector] public Quaternion startingLocalRot;
-        [HideInInspector] public Vector3 PrePosition;//世界坐标系
-        [HideInInspector] public Quaternion PreRoation;//世界坐标系
-        [HideInInspector] public Quaternion NextLocalRoation;//目标局部旋转角
-        [HideInInspector] public Vector3 velocity;//当前线速度
-        [HideInInspector] public Vector3 angularVelocity;//当前角速度
-        [HideInInspector] public float rotationError;//控制误差，用于inference中最后输出结果
-        [HideInInspector] public bool preContact;//上一帧是否着地，只针对脚
+        [HideInInspector] public Vector3 PrePosition;
+        [HideInInspector] public Quaternion PreRoation;
+        [HideInInspector] public Quaternion NextLocalRoation;
+        [HideInInspector] public Vector3 velocity;
+        [HideInInspector] public Vector3 angularVelocity;
+        [HideInInspector] public float rotationError;
+        [HideInInspector] public bool preContact;
 
         [Header("Ground & Target Contact")]
         [Space(10)]
@@ -39,7 +38,7 @@ namespace Unity.MLAgentsExamples
         [Space(10)]
         public Vector3 currentEularJointRotation;
 
-        [HideInInspector] public float currentStrength;//此处是关节力矩的上限值，不是当前力矩
+        [HideInInspector] public float currentStrength;
         public float currentXNormalizedRot;
         public float currentYNormalizedRot;
         public float currentZNormalizedRot;
