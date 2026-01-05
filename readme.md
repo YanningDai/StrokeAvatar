@@ -6,9 +6,7 @@ This repository contains code and data for the paper: *Wearable-informed generat
 
 ## System Requirements
 
-StrokeAvatar includes a Unity Editor for visualization and a Python environment for training, which can be used independently. For example, the Unity Editor
-can be run on macOS for visualization, while training is performed on a Linux
-machine.
+StrokeAvatar includes a Unity Editor for dataset visualization and a Python environment for training, which can be used independently. For example, the Unity Editor can be run on macOS for visualization, while training is performed on a Linux machine.
 
 - **Tested platforms:** Windows 10/11, macOS (Apple Silicon M3), Linux Ubuntu 24.04.3 LTS.
 
@@ -20,23 +18,17 @@ machine.
 
 Typical installation time: **~10 minutes** (excluding Unity Editor download)
 
-### 1. Unity Editor Setup
-
-The Unity Editor is used for visualizing motion capture data and configuring custom rehabilitation tasks.
+### Unity Editor Setup
 
 1. Install Unity Hub and Unity Editor (2021.3 or later) from  https://unity.com/download  
 
    > **Note:** Ubuntu 24.04 users should install Unity **6000.x** (Unity 6) instead of 2021.3 LTS.
 
-2. Clone this repository:
-```bash
-   git clone git@github.com:YanningDai/StrokeAvatar.git
-```
-3. Open the project in the Unity Editor. The required ML-Agents and ML-Agents Extensions packages will be automatically installed via the Unity Package Manager.
+2. Clone this repository:`git clone git@github.com:YanningDai/StrokeAvatar.git`
 
-### 2. Python Environment Setup
+3. Open the project in the Unity Editor. The required packages will be automatically installed.
 
-The Python environment is used exclusively for reinforcement learning training and can be run independently of the Unity Editor.
+### Python Environment Setup
 
 **Windows and Linux**
 
@@ -48,8 +40,6 @@ python -m pip install mlagents==0.30.0
 > **Windows note**: PyTorch may need to be installed manually before installing ML-Agents `pip3 install torch~=1.7.1 -f https://download.pytorch.org/whl/torch_stable.html`
 
 **macOS (Apple Silicon)**
-
-On macOS, ML-Agents is installed from source to ensure compatibility with the Python and PyTorch ecosystem.
 
 ```bash
 # Set up conda environment
@@ -77,8 +67,6 @@ python -m pip install ./ml-agents --no-deps
 
 ## Environments
 
-Open the project in Unity for visualization.
-
 - **Database** — Process and visualize motion data. Press **Play** to start.
   - **Show Results** disabled: displays raw data (`StreamingAssets/NoitomData/`, `StreamingAssets/MocapData/`) and performs physics-based data processing.
   - **Show Results** enabled: displays processed datasets (`StreamingAssets/OutputHealthDataset/`, `StreamingAssets/OutputPatientDataset/`).
@@ -91,7 +79,7 @@ Open the project in Unity for visualization.
 
 ## Training
 
-Two training modes are supported on **macOS, Linux, and Windows**.
+Two training modes are supported:
 
 ### 1. Interactive Unity Environment
 
@@ -101,15 +89,13 @@ Used primarily for debugging and visualization within the Unity Editor.
 ```bash
 mlagents-learn <config_file> --run-id <run_name>
 
-# Example: healthy atlas training
+# Example: 
 mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml --run-id healthatlas_1
 ```
 
 ### 2. Standalone Built Environment
 
-Recommended for large-scale training.
-
-First, build the Unity environment for your target operating system (macOS, Linux, or Windows), then train using the exported executable.:
+Recommended for large-scale training. First, build the Unity environment for your target operating system (macOS, Linux, or Windows), then train using the exported executable.:
 
 ```bash
 mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml \
@@ -119,9 +105,7 @@ mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml \
 ```
 > Note: On Linux and Windows, replace env.app with the corresponding built executable.
 
-Once training starts, real-time visualization is displayed automatically, and
-the terminal reports training logs (steps, rewards, and policy updates).
-Training curves can be monitored using **TensorBoard**. A full training run typically takes **~7 hours** on a single **NVIDIA RTX 3090 GPU**.
+Once training starts, real-time visualization is displayed automatically, and the terminal reports training logs (steps, rewards, and policy updates). Training curves can be monitored using **TensorBoard**. A full training run typically takes **~7 hours** on a single **NVIDIA RTX 3090 GPU**.
 
 **Note**
 
