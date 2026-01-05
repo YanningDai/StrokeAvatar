@@ -31,7 +31,6 @@ python -m pip install mlagents==0.30.0
 > Installing mlagents==0.30.0 will automatically install a compatible version of PyTorch and other required dependencies.
 > 
 
----
 
 ## Repository Structure
 
@@ -54,7 +53,7 @@ python -m pip install mlagents==0.30.0
 
 Open the project directly in Unity for visualization and environment inspection.
 
-### 1. Database Env
+### 1. Database Environment
 
 - Press **Play** to process and visualize motion data.
 - When **Show Results** is disabled:
@@ -68,7 +67,7 @@ Open the project directly in Unity for visualization and environment inspection.
     - `Assets/StreamingAssets/OutputPatientDataset`
 - In Play Mode, selecting **Health** visualizes healthy subjects; otherwise, patient data are shown.
 
-### 2. Controller Env
+### 2. Controller Environment
 
 - **Healthy Atlas Model**  
   - Disable `usePatientData`
@@ -78,7 +77,7 @@ Open the project directly in Unity for visualization and environment inspection.
   - Enable `usePatientData`
   - Specify the path to an individual patient’s data to train a personalized control policy.
 
-### 3. Prediction Env
+### 3. Prediction Environment
 
 - Predicts patient locomotion under different rehabilitation tasks.
 - Currently supported tasks:
