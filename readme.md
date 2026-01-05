@@ -24,7 +24,7 @@ Typical installation time: **~10 minutes** (excluding Unity Editor download)
 
    > **Note:** Ubuntu 24.04 users should install Unity **6000.x** (Unity 6) instead of 2021.3 LTS.
 
-2. Clone this repository:`git clone git@github.com:YanningDai/StrokeAvatar.git`
+2. Clone this repository.
 
 3. Open the project in the Unity Editor. The required packages will be automatically installed.
 
@@ -105,7 +105,7 @@ mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml \
 ```
 > Note: On Linux and Windows, replace env.app with the corresponding built executable.
 
-Once training starts, real-time visualization is displayed automatically, and the terminal reports training logs (steps, rewards, and policy updates). Training curves can be monitored using **TensorBoard**. A full training run typically takes **~7 hours** on a single **NVIDIA RTX 3090 GPU**.
+Once training starts, real-time visualization is displayed automatically, and the terminal reports training logs (steps, rewards, and policy updates). Training curves can be monitored using TensorBoard. A full training run typically takes **~7 hours** on a single NVIDIA RTX 3090 GPU.
 
 **Note**
 
