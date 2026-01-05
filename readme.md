@@ -20,7 +20,7 @@ machine.
 
 Typical installation time: **~10 minutes** (excluding Unity Editor download)
 
-### Unity Editor Setup
+### 1. Unity Editor Setup
 
 The Unity Editor is used for visualizing motion capture data and configuring custom rehabilitation tasks.
 
@@ -34,7 +34,7 @@ The Unity Editor is used for visualizing motion capture data and configuring cus
 ```
 3. Open the project in the Unity Editor. The required ML-Agents and ML-Agents Extensions packages will be automatically installed via the Unity Package Manager.
 
-### Python Environment Setup
+### 2. Python Environment Setup
 
 The Python environment is used exclusively for reinforcement learning training and can be run independently of the Unity Editor.
 
@@ -78,9 +78,6 @@ python -m pip install ./ml-agents --no-deps
 ## Environments
 
 Open the project in Unity for visualization.
-
-- **Database** — Process and visualize motion data. Toggle **Show Results** to switch between raw data and processed datasets. Select **Health** to view healthy subjects.
-
 
 - **Database** — Process and visualize motion data. Press **Play** to start.
   - **Show Results** disabled: displays raw data (`StreamingAssets/NoitomData/`, `StreamingAssets/MocapData/`) and performs physics-based data processing.
