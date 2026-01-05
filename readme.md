@@ -1,90 +1,96 @@
 # StrokeAvatar
 
-Code and resources for the manuscript:
+**StrokeAvatar** is a wearable-informed generative framework that reconstructs individualized post-stroke locomotor control from inertial sensing and predicts task-conditioned gait in unseen environments.
 
-**Wearable-informed generative digital avatars predict task-conditioned post-stroke locomotion**
+This repository contains code and data for the paper: *Wearable-informed generative digital avatars predict task-conditioned post-stroke locomotion*
 
+## System Requirements
 
-## Overview
+StrokeAvatar includes a Unity Editor for visualization and a Python environment for training, which can be used independently. For example, the Unity Editor
+can be run on macOS for visualization, while training is performed on a Linux
+machine.
 
-**StrokeAvatar** is a Unity ML-Agents–based framework for learning wearable-informed generative digital avatars that predict task-conditioned locomotion in post-stroke patients.
+- **Tested platforms:** Windows 10/11, macOS (Apple Silicon M3), Linux Ubuntu 24.04.3 LTS.
 
-The system integrates motion capture data, physics-based optimization, and reinforcement learning to model healthy locomotion priors and patient-specific adaptations across rehabilitation tasks.
+- **Unity:** 2021.3 or later (Unity 6000.3 required on Ubuntu 24.04.3 LTS).  
 
-## Requirements
+- **Python:** Python 3.8.13 with ML-Agents 0.30.0.
 
-- **Unity** ≥ 2021.3  
-- **ML-Agents** ≥ Release 19  
-- **Operating systems:** macOS, Linux, and Windows  
-- Tested on Unity **2021.3** and **2022.3**, ML-Agents Release **19** and **20**
+## Installation Guide
 
-ML-Agents installation guide:  
-https://github.com/Unity-Technologies/ml-agents/blob/release_20_docs/docs/Installation.md
+Typical installation time: **~10 minutes** (excluding Unity Editor download)
 
-## Python Environment
+### Unity Editor Setup
+
+The Unity Editor is used for visualizing motion capture data and configuring custom rehabilitation tasks.
+
+1. Install Unity Hub and Unity Editor (2021.3 or later) from  https://unity.com/download  
+
+   > **Note:** Ubuntu 24.04 users should install Unity **6000.x** (Unity 6) instead of 2021.3 LTS.
+
+2. Clone this repository:
+```bash
+   git clone git@github.com:YanningDai/StrokeAvatar.git
+```
+3. Open the project in the Unity Editor. The required ML-Agents and ML-Agents Extensions packages will be automatically installed via the Unity Package Manager.
+
+### Python Environment Setup
+
+The Python environment is used exclusively for reinforcement learning training and can be run independently of the Unity Editor.
+
+**Windows and Linux**
 
 ```bash
 conda create -n strokeavatar python=3.8.13 -y
 conda activate strokeavatar
 python -m pip install mlagents==0.30.0
 ```
-> Installing mlagents==0.30.0 will automatically install a compatible version of PyTorch and other required dependencies.
-> 
+> **Windows note**: PyTorch may need to be installed manually before installing ML-Agents `pip3 install torch~=1.7.1 -f https://download.pytorch.org/whl/torch_stable.html`
+
+**macOS (Apple Silicon)**
+
+On macOS, ML-Agents is installed from source to ensure compatibility with the Python and PyTorch ecosystem.
+
+```bash
+# Set up conda environment
+git clone https://github.com/AmineAndam04/Conda-Env-Unity-ML-Agent.git
+cd Conda-Env-Unity-ML-Agent
+conda env create -f ml-agents.yaml -n strokeavatar
+conda activate strokeavatar
+
+# Install ML-Agents from source
+git clone --branch release_20 https://github.com/Unity-Technologies/ml-agents.git
+cd ml-agents
+python -m pip install ./ml-agents-envs
+python -m pip install ./ml-agents --no-deps
+```
 
 
 ## Repository Structure
 
-- **Data**  
-  `Assets/StreamingAssets/`  
-  Contains both raw motion data and processed datasets.
+| Directory | Description |
+|-----------|-------------|
+| `Assets/StreamingAssets/` | Raw motion data and processed datasets |
+| `Assets/ML-Agents/StrokeAvatar/Scenes/` | Unity environments: `Database`, `Controller`, `Predictor` |
+| `Assets/ML-Agents/StrokeAvatar/Config/` | YAML configuration files |
 
-- **Environments**  
-  `Assets/ML-Agents/StrokeAvatar/Scenes/`  
-  Three Unity environments corresponding to different stages of the pipeline:
-  - `Database`
-  - `Controller`
-  - `Predictor`
 
-- **Configurations**  
-  `Assets/ML-Agents/StrokeAvatar/Config/`  
-  YAML configuration files for different models and rehabilitation tasks.
+## Environments
 
-## Environments and Visualization
+Open the project in Unity for visualization.
 
-Open the project directly in Unity for visualization and environment inspection.
+- **Database** — Process and visualize motion data. Toggle **Show Results** to switch between raw data and processed datasets. Select **Health** to view healthy subjects.
 
-### 1. Database Environment
 
-- Press **Play** to process and visualize motion data.
-- When **Show Results** is disabled:
-  - Displays raw motion data from:
-    - `Assets/StreamingAssets/NoitomData`
-    - `Assets/StreamingAssets/MocapData`
-  - Performs physics-based optimization and saves processed results.
-- When **Show Results** is enabled:
-  - Displays processed datasets stored in:
-    - `Assets/StreamingAssets/OutputHealthDataset`
-    - `Assets/StreamingAssets/OutputPatientDataset`
-- In Play Mode, selecting **Health** visualizes healthy subjects; otherwise, patient data are shown.
+- **Database** — Process and visualize motion data. Press **Play** to start.
+  - **Show Results** disabled: displays raw data (`StreamingAssets/NoitomData/`, `StreamingAssets/MocapData/`) and performs physics-based data processing.
+  - **Show Results** enabled: displays processed datasets (`StreamingAssets/OutputHealthDataset/`, `StreamingAssets/OutputPatientDataset/`).
+  - Select **ifHealth** to view healthy subjects; otherwise patient data is shown.
 
-### 2. Controller Environment
+- **Controller** — Train locomotion controllers. Disable `usePatientData` for the healthy atlas model, or enable it with a patient data path for patient-specific training.
 
-- **Healthy Atlas Model**  
-  - Disable `usePatientData`
-  - Trains an average healthy locomotion controller with randomized step length and speed.
+- **Predictor** — Predict patient locomotion under rehabilitation tasks (slope ascent, stair climbing). Toggle tasks via `Slope`/`Stair` objects in the scene. Supports curriculum learning with five difficulty levels.
 
-- **Patient-Specific Controller**  
-  - Enable `usePatientData`
-  - Specify the path to an individual patient’s data to train a personalized control policy.
-
-### 3. Prediction Environment
-
-- Predicts patient locomotion under different rehabilitation tasks.
-- Currently supported tasks:
-  - Slope Ascent 
-  - Stair Climbing
-- Tasks are toggled by enabling/disabling `Slope` or `Stair` objects in the scene.
-- Curriculum learning is supported via configuration files, with five difficulty levels from easy to hard.
 
 ## Training
 
@@ -116,22 +122,22 @@ mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-health.yaml \
 ```
 > Note: On Linux and Windows, replace env.app with the corresponding built executable.
 
+Once training starts, real-time visualization is displayed automatically, and
+the terminal reports training logs (steps, rewards, and policy updates).
+Training curves can be monitored using **TensorBoard**. A full training run typically takes **~7 hours** on a single **NVIDIA RTX 3090 GPU**.
 
-Patient-specific controllers are initialized from the trained healthy atlas model
-using `--initialize-from`:
-```bash
-mlagents-learn Assets/ML-Agents/StrokeAvatar/Config/Controller-patient.yaml \
-  --env env.app \
-  --run-id patient_01 \
-  --num-envs=20 \
-  --initialize-from healthatlas_2
+**Note**
 
-```
+- To continue training from an existing network (e.g., a trained healthy atlas),
+  add `--initialize-from <run_id>` (e.g., `--initialize-from healthatlas_2`).
 
-For the prediction environment, the demonstration path specified in the YAML file must be updated to point to a patient-specific controller demonstration. Demonstrations are recorded in the Controller environment using the
-**Demonstration Recorder** component. (see tutorials in https://www.youtube.com/watch?v=Dhr4tHY3joE)
+- If expert demonstrations are required (e.g., in the prediction environment),
+  update the demonstration path in the YAML file to point to the corresponding
+  recorded demo. Demonstrations can be recorded in the Controller environment
+  using the Demonstration Recorder component.
+
 
 ## License
 
-This repository is released for research purposes only.
-Please refer to the manuscript for details on data usage and ethical approval.
+This project is released under the MIT License (OSI-approved).
+The license permits free use, modification, and redistribution with attribution. See the `LICENSE` file for full details.
