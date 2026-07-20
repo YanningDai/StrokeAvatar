@@ -61,7 +61,7 @@ python -m pip install ./ml-agents --no-deps
 
 | Directory | Description |
 |-----------|-------------|
-| `Assets/StreamingAssets/` | Raw motion data and processed datasets |
+| `Assets/StreamingAssets/` | Deidentified source motion data and processed datasets |
 | `Assets/ML-Agents/StrokeAvatar/Scenes/` | Unity environments: `Database`, `Controller`, `Predictor` |
 | `Assets/ML-Agents/StrokeAvatar/Config/` | YAML configuration files |
 
